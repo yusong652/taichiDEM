@@ -8,12 +8,12 @@ from visual import VisualTool
 
 # initialization
 ti.init(arch=ti.cpu, device_memory_fraction=0.7,
-        random_seed=1024, default_fp=ti.f64,
+        random_seed=1024, default_fp=ti.f32,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
 
-gf = GrainFiled(2048)  # Grain field
+gf = GrainFiled(256)  # Grain field
 ci = ContactInfo(gf.num_ptc)  # Contact info
 gd = GridDomain(num_ptc=gf.num_ptc, rad_max=gf.rad_max[0])  # Grid domain
 vt = VisualTool(n=gf.num_ptc)

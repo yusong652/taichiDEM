@@ -1,55 +1,56 @@
 import taichi as ti
 vec = ti.math.vec3
 
+flt_dtype = ti.f32
 
 @ti.data_oriented
 class GrainFiled:
     def __init__(self, num_ptc):
         self.num_ptc = num_ptc
-        self.rad_max = ti.field(dtype=ti.f64, shape=(1,))
+        self.rad_max = ti.field(dtype=flt_dtype, shape=(1,))
         self.rad_max[0] = 0.01
-        self.rad_min = ti.field(dtype=ti.f64, shape=(1,))
+        self.rad_min = ti.field(dtype=flt_dtype, shape=(1,))
         self.rad_min[0] = 0.01
-        self.density = ti.field(dtype=ti.f64, shape=(1,))
+        self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0 * 1.0
         self.gravity = 9.81 * 10.0
-        self.pos = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.pos = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                             name="position")
-        self.pos_pre = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.pos_pre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="previous position")
         self.grid_idx = ti.field(dtype=ti.i32, shape=(num_ptc, 3),
                                  name="grid_idx")  # id of located grid
-        self.mass = ti.field(dtype=ti.f64, shape=(num_ptc,),
+        self.mass = ti.field(dtype=flt_dtype, shape=(num_ptc,),
                              name="mass")
-        self.rad = ti.field(dtype=ti.f64, shape=(num_ptc,),
+        self.rad = ti.field(dtype=flt_dtype, shape=(num_ptc,),
                             name="radius")
-        self.inertia = ti.field(dtype=ti.f64, shape=(num_ptc,),
+        self.inertia = ti.field(dtype=flt_dtype, shape=(num_ptc,),
                                 name="inertial moment")
-        self.vel = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.vel = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                             name="velocity")
-        self.vel_pre = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.vel_pre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="previous velocity")
-        self.vel_rot = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.vel_rot = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="rotational velocity")
-        self.vel_rot_pre = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.vel_rot_pre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                     name="previous rotational vel")
-        self.acc = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.acc = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                             name="acceleration")
-        self.acc_rot = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.acc_rot = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="rotational acceleration")
-        self.force_n = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.force_n = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="contact normal force")
-        self.force_s = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.force_s = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="contact shear force")
-        self.force = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.force = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                               name="contact force")
-        self.moment = ti.field(dtype=ti.f64, shape=(num_ptc, 3),
+        self.moment = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                name="moment")
-        self.volume_s = ti.field(dtype=ti.f64, shape=(1), name='solid volume')
+        self.volume_s = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
     @ti.kernel
-    def init_particle(self, init_len_x: ti.f64, init_len_y: ti.f64,
-                      init_len_z: ti.f64,):
+    def init_particle(self, init_len_x: flt_dtype, init_len_y: flt_dtype,
+                      init_len_z: flt_dtype,):
         """
         Distribute particles into a cuboid space randomly
         Note that the collapse between particles is inevitable
@@ -118,7 +119,7 @@ class GrainFiled:
                 self.acc_rot[i, j] = self.moment[i, j] / self.inertia[i]
 
     @ti.kernel
-    def update_vel(self, dt: ti.f64):
+    def update_vel(self, dt: flt_dtype):
         """
         Record the rotational and translational velocity to previous
         velocity field to obtain the initial shear displacement inc-
@@ -147,7 +148,7 @@ class GrainFiled:
         # self.vel[0, 1] = 0.0
 
     @ti.kernel
-    def update_pos(self, dt: ti.f64):
+    def update_pos(self, dt: flt_dtype):
         """
         The position of particle is updated based on
         :param dt:
@@ -171,7 +172,7 @@ class GrainFiled:
                 self.force_s[i, j] = 0.0
                 self.moment[i, j] = 0.0
 
-    def update(self, dt: ti.f64):
+    def update(self, dt: flt_dtype):
         self.update_acc()
         self.clear_force()
         self.update_vel(dt)

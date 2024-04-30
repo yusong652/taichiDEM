@@ -2,7 +2,7 @@ import taichi as ti
 import numpy as np
 
 vec = ti.math.vec3
-
+flt_dtype = ti.f32
 
 @ti.data_oriented
 class ContactInfo(object):
@@ -12,17 +12,17 @@ class ContactInfo(object):
 
     def __init__(self, n, fric=0.5, stiff_n=5.0e7, stiff_s=1.0e7, ):
         self.n = n  # number of particles or rows for contact info storage
-        self.fric = ti.field(dtype=ti.f64, shape=(1,))
+        self.fric = ti.field(dtype=flt_dtype, shape=(1,))
         self.fric[0] = fric
-        self.stiff_n = ti.field(dtype=ti.f64, shape=(1,))
+        self.stiff_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiff_n[0] = stiff_n
-        self.stiff_s = ti.field(dtype=ti.f64, shape=(1,))
+        self.stiff_s = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiff_s[0] = stiff_s
-        self.damp_bb_n = ti.field(dtype=ti.f64, shape=(1,))
+        self.damp_bb_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_bb_n[0] = 0.7
-        self.damp_bb_s = ti.field(dtype=ti.f64, shape=(1,))
+        self.damp_bb_s = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_bb_s[0] = 0.2
-        self.damp_wb = ti.field(dtype=ti.f64, shape=(1,))
+        self.damp_wb = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_wb[0] = 0.3
         self.con_rec_len = 64
         # id of particles in contact
@@ -33,24 +33,24 @@ class ContactInfo(object):
                                      name="contacts_pre")
         # contact number on one particle
         self.contact_count = ti.field(dtype=ti.i32, shape=(self.n,))
-        self.contact_dist_x = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.contact_dist_y = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.contact_dist_z = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
+        self.contact_dist_x = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.contact_dist_y = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.contact_dist_z = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # shear force components
-        self.force_s_x = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.force_s_y = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.force_s_z = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
+        self.force_s_x = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.force_s_y = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.force_s_z = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # normal force components
-        self.force_n_x = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.force_n_y = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.force_n_z = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
+        self.force_n_x = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.force_n_y = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.force_n_z = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # shear force component in the last cycle
-        self.force_s_x_pre = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.force_s_y_pre = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
-        self.force_s_z_pre = ti.field(dtype=ti.f64, shape=(self.n, self.con_rec_len))
+        self.force_s_x_pre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.force_s_y_pre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.force_s_z_pre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # DEBUG Mode *********************************
-        self.acc_disp = ti.field(dtype=ti.f64, shape=(1,))
-        self.acc_force = ti.field(dtype=ti.f64, shape=(1,))
+        self.acc_disp = ti.field(dtype=flt_dtype, shape=(1,))
+        self.acc_force = ti.field(dtype=flt_dtype, shape=(1,))
         # DEBUG Mode *********************************
 
     def init_contact(self, dt, gf, gd):
@@ -219,7 +219,7 @@ class ContactInfo(object):
                                 pass
 
     @ti.func
-    def get_gap(self, gf: ti.template(), i: ti.i32, j: ti.i32) -> ti.f64:
+    def get_gap(self, gf: ti.template(), i: ti.i32, j: ti.i32) -> flt_dtype:
         """
         the gap between two particle is ([distance] - [sum of radii])
         :param gf: grain fields

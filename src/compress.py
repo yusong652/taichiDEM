@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 vec = ti.math.vec3
+flt_dtype = ti.f32
 
 
 @ti.data_oriented
@@ -17,33 +18,33 @@ class IsoComp(object):
             self.vt = params['vt']  # visualization tool
         else:
             pass  # Visual mode off
-        self.time_duration = ti.field(dtype=ti.f64, shape=(1,))
+        self.time_duration = ti.field(dtype=flt_dtype ,shape=(1,))
         self.time_duration[0] = 0.0
-        self.dt = ti.field(dtype=ti.f64, shape=(1,))
-        self.p_tgt_0 = ti.field(dtype=ti.f64, shape=(1,))
-        self.p_tgt_u = ti.field(dtype=ti.f64, shape=(1,))
+        self.dt = ti.field(dtype=ti.f32, shape=(1,))
+        self.p_tgt_0 = ti.field(dtype=flt_dtype, shape=(1,))
+        self.p_tgt_u = ti.field(dtype=flt_dtype, shape=(1,))
         self.p_tgt_u[0] = p
         self.p_tgt_0[0] = 1.0 * 1e4
-        self.p_tgt = ti.field(dtype=ti.f64, shape=(1,))
+        self.p_tgt = ti.field(dtype=flt_dtype, shape=(1,))
         self.p_tgt[0] = self.p_tgt_0[0]
-        self.len = ti.field(dtype=ti.f64, shape=3)
+        self.len = ti.field(dtype=flt_dtype, shape=3)
         self.len[0] = self.gd.domain_size * 0.8
         self.len[1] = self.gd.domain_size * 0.8
         self.len[2] = self.gd.domain_size * 0.8
-        self.disp = ti.field(dtype=ti.f64, shape=3)
-        self.disp_acc = ti.field(dtype=ti.f64, shape=3)
+        self.disp = ti.field(dtype=flt_dtype, shape=3)
+        self.disp_acc = ti.field(dtype=flt_dtype, shape=3)
         self.volume = self.len[0] * self.len[1] * self.len[2]
-        self.e = ti.field(dtype=ti.f64, shape=1)
-        self.force = ti.field(dtype=ti.f64, shape=3)
-        self.area = ti.field(dtype=ti.f64, shape=3)
-        self.stress = ti.field(dtype=ti.f64, shape=3)
-        self.stiffness = ti.field(dtype=ti.f64, shape=3)
-        self.cn = ti.field(dtype=ti.f64, shape=3)
-        self.force_tgt = ti.field(dtype=ti.f64, shape=3)
-        self.vel_tgt = ti.field(dtype=ti.f64, shape=3)
-        self.ratio_stress = ti.field(dtype=ti.f64, shape=3)
+        self.e = ti.field(dtype=flt_dtype, shape=1)
+        self.force = ti.field(dtype=flt_dtype, shape=3)
+        self.area = ti.field(dtype=flt_dtype, shape=3)
+        self.stress = ti.field(dtype=flt_dtype, shape=3)
+        self.stiffness = ti.field(dtype=flt_dtype, shape=3)
+        self.cn = ti.field(dtype=flt_dtype, shape=3)
+        self.force_tgt = ti.field(dtype=flt_dtype, shape=3)
+        self.vel_tgt = ti.field(dtype=flt_dtype, shape=3)
+        self.ratio_stress = ti.field(dtype=flt_dtype, shape=3)
         self.cyc_num = ti.field(dtype=ti.i32, shape=1)
-        self.vel_lmt = ti.field(dtype=ti.f64, shape=3)
+        self.vel_lmt = ti.field(dtype=flt_dtype, shape=3)
 
     def init(self,):
         self.dt[0] = 0.2 * ti.sqrt(ti.math.pi * 4 / 3 * self.gf.rad_min[0]
@@ -224,7 +225,7 @@ class IsoComp(object):
         self.vel_lmt[1] = 0.0
         self.vel_lmt[2] = 0.0
         #  calm
-        calm_time = 30
+        calm_time = 10
         sub_calm_time = 200
         for i in range(calm_time):
             for j in range(sub_calm_time):
