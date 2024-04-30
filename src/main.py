@@ -7,7 +7,7 @@ from visual import VisualTool
 
 
 # initialization
-ti.init(arch=ti.cpu, device_memory_fraction=0.7,
+ti.init(arch=ti.gpu, device_memory_fraction=0.7,
         random_seed=1024, default_fp=ti.f32,
         default_ip=ti.i32, debug=True,
         fast_math=False)
