@@ -8,9 +8,9 @@ class GrainFiled:
     def __init__(self, num_ptc):
         self.num_ptc = num_ptc
         self.rad_max = ti.field(dtype=flt_dtype, shape=(1,))
-        self.rad_max[0] = 0.01
+        self.rad_max[0] = 0.004
         self.rad_min = ti.field(dtype=flt_dtype, shape=(1,))
-        self.rad_min[0] = 0.01
+        self.rad_min[0] = 0.002
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0 * 1.0
         self.gravity = 9.81 * 10.0
@@ -49,8 +49,10 @@ class GrainFiled:
         self.volume_s = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
     @ti.kernel
-    def init_particle(self, init_len_x: flt_dtype, init_len_y: flt_dtype,
-                      init_len_z: flt_dtype,):
+    def init_particle(self, 
+        init_x_min: flt_dtype, init_x_max: flt_dtype,
+        init_y_min: flt_dtype, init_y_max: flt_dtype,
+        init_z_min: flt_dtype, init_z_max: flt_dtype):
         """
         Distribute particles into a cuboid space randomly
         Note that the collapse between particles is inevitable
@@ -66,10 +68,13 @@ class GrainFiled:
         """
         for i in range(self.num_ptc):
             # Distribute particles in a cubic enclosed space.
+            init_len_x = init_x_max - init_x_min
+            init_len_y = init_y_max - init_y_min
+            init_len_z = init_z_max - init_z_min
             pos = vec(
-                ti.random() * init_len_x - init_len_x / 2,
-                ti.random() * init_len_y - init_len_y / 2,
-                ti.random() * init_len_z - init_len_z / 2
+                ti.random() * init_len_x + init_x_min,
+                ti.random() * init_len_y + init_y_min,
+                ti.random() * init_len_z + init_z_min
             )
             self.pos[i, 0] = pos[0]
             self.pos[i, 1] = pos[1]

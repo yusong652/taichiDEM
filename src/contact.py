@@ -721,12 +721,12 @@ class ContactInfo(object):
             y = gf.pos[i, 1]
             z = gf.pos[i, 2]
             # Gap from the boundary in negative x direction:
-            gap_x_n = x - gf.rad[i] + ic.len[0] / 2.0
-            gap_x_p = -x - gf.rad[i] + ic.len[0] / 2.0
-            gap_y_n = y - gf.rad[i] + ic.len[1] / 2.0
-            gap_y_p = -y - gf.rad[i] + ic.len[1] / 2.0
-            gap_z_n = z - gf.rad[i] + ic.len[2] / 2.0
-            gap_z_p = -z - gf.rad[i] + ic.len[2] / 2.0
+            gap_x_n = x - gf.rad[i] - ic.bdr_min[0]
+            gap_x_p = -x - gf.rad[i] + ic.bdr_max[0]
+            gap_y_n = y - gf.rad[i] - ic.bdr_min[1]
+            gap_y_p = -y - gf.rad[i] + ic.bdr_max[1]
+            gap_z_n = z - gf.rad[i] - ic.bdr_min[2]
+            gap_z_p = -z - gf.rad[i] + ic.bdr_max[2]
 
             if gap_x_n < 0:
                 gf.force_n[i, 0] -= gap_x_n * self.stiff_n[0]

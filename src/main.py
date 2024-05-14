@@ -13,12 +13,12 @@ ti.init(arch=ti.gpu, device_memory_fraction=0.7,
         fast_math=False)
 
 
-gf = GrainFiled(256)  # Grain field
+gf = GrainFiled(1024 * 128)  # Grain field
 ci = ContactInfo(gf.num_ptc)  # Contact info
 gd = GridDomain(num_ptc=gf.num_ptc, rad_max=gf.rad_max[0])  # Grid domain
-vt = VisualTool(n=gf.num_ptc)
+# vt = VisualTool(n=gf.num_ptc)
 
-ic = IsoComp(gf, ci, gd, vt=vt)  # Isotropic compression
+ic = IsoComp(gf, ci, gd)  # Isotropic compression
 ic.init()
 if __name__ == "__main__":
-    ic.compress()
+    ic.pour()

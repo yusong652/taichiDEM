@@ -27,10 +27,18 @@ class IsoComp(object):
         self.p_tgt_0[0] = 1.0 * 1e4
         self.p_tgt = ti.field(dtype=flt_dtype, shape=(1,))
         self.p_tgt[0] = self.p_tgt_0[0]
+        self.bdr_min = ti.field(dtype=flt_dtype, shape=3)
+        self.bdr_max = ti.field(dtype=flt_dtype, shape=3)
+        self.bdr_min[0] = -self.gd.domain_size * 0.2
+        self.bdr_min[1] = -self.gd.domain_size * 0.4
+        self.bdr_min[2] = -self.gd.domain_size * 0.3
+        self.bdr_max[0] = self.gd.domain_size * 0.2
+        self.bdr_max[1] = self.gd.domain_size * 0.4
+        self.bdr_max[2] = self.gd.domain_size * (-0.1)
         self.len = ti.field(dtype=flt_dtype, shape=3)
-        self.len[0] = self.gd.domain_size * 0.8
-        self.len[1] = self.gd.domain_size * 0.8
-        self.len[2] = self.gd.domain_size * 0.8
+        self.len[0] = self.bdr_max[0] - self.bdr_min[0]
+        self.len[1] = self.bdr_max[1] - self.bdr_min[1]
+        self.len[2] = self.bdr_max[2] - self.bdr_min[2]
         self.disp = ti.field(dtype=flt_dtype, shape=3)
         self.disp_acc = ti.field(dtype=flt_dtype, shape=3)
         self.volume = self.len[0] * self.len[1] * self.len[2]
@@ -47,9 +55,12 @@ class IsoComp(object):
         self.vel_lmt = ti.field(dtype=flt_dtype, shape=3)
 
     def init(self,):
-        self.dt[0] = 0.2 * ti.sqrt(ti.math.pi * 4 / 3 * self.gf.rad_min[0]
+        self.dt[0] = 0.6 * ti.sqrt(ti.math.pi * 4 / 3 * self.gf.rad_min[0]
                                    ** 3 * self.gf.density[0] / self.ci.stiff_n[0])
-        self.gf.init_particle(self.len[0], self.len[1], self.len[2],)
+        self.gf.init_particle(
+            self.bdr_min[0]+self.len[0]*0.05, self.bdr_max[0]-self.len[0]*0.05,
+            self.bdr_min[1]+self.len[1]*0.05, self.bdr_max[1]-self.len[1]*0.05,
+            self.bdr_min[2]+self.len[2]*0.05, self.bdr_max[2]-self.len[2]*0.05)
         self.ci.init_contact(self.dt[0], self.gf, self.gd)
         # self.write_ic_info_title()
 
@@ -101,10 +112,20 @@ class IsoComp(object):
             self.disp[i] = - self.dt[0] * self.vel_tgt[i]
             self.disp_acc[i] += self.disp[i]
 
+    def get_bdr_min(self):
+        self.bdr_min[0] += self.disp[0]
+        self.bdr_min[1] += self.disp[1]
+        self.bdr_min[2] += self.disp[2]
+
+    def get_bdr_max(self):
+        self.bdr_max[0] -= self.disp[0]
+        self.bdr_max[1] -= self.disp[1]
+        self.bdr_max[2] -= self.disp[2]
+
     def get_len(self):
-        self.len[0] += self.disp[0]
-        self.len[1] += self.disp[1]
-        self.len[2] += self.disp[2]
+        self.len[0] = self.bdr_max[0] - self.bdr_min[0]
+        self.len[1] = self.bdr_max[1] - self.bdr_min[1]
+        self.len[2] = self.bdr_max[2] - self.bdr_min[2]
 
     def get_volume(self):
         self.volume = self.len[0] * self.len[1] * self.len[2]
@@ -135,6 +156,8 @@ class IsoComp(object):
         self.ci.get_force_shear_inc(self.gf)
         self.gf.update_pos(self.dt[0])
         self.get_disp()
+        self.get_bdr_min()
+        self.get_bdr_max()
         self.get_len()
         self.get_area()
         self.get_stress()
@@ -225,11 +248,12 @@ class IsoComp(object):
         self.vel_lmt[1] = 0.0
         self.vel_lmt[2] = 0.0
         #  calm
-        calm_time = 10
+        calm_time = 20
         sub_calm_time = 200
         for i in range(calm_time):
             for j in range(sub_calm_time):
                 self.update()
+            print("{} steps finished in calm phase".format(sub_calm_time))
             self.gf.calm()
         for p_tgt in p_targets:
             self.p_tgt[0] = p_tgt
@@ -254,6 +278,49 @@ class IsoComp(object):
             self.write_ball_info(save_n, self.gf)
             self.write_ic_info()
             save_n += 1
+
+    def pour(self,):
+        """pour the particles for demo"""
+        self.vel_lmt[0] = 0.0
+        self.vel_lmt[1] = 0.0
+        self.vel_lmt[2] = 0.0
+        self.substep_comp = 5000
+        #  calm
+        calm_time = 10
+        sub_calm_time = 10000
+        rec_count = 0
+        for i in range(calm_time):
+            for j in range(sub_calm_time):
+                self.update()
+            print("{} steps finished in calm phase".format(sub_calm_time))
+            self.gf.calm()
+        while True:
+            if 'vt' in self.params:
+                self.vt.update_pos(self.gf)
+                self.vt.render(self.gf)
+
+            for j in range(self.substep_comp):
+                self.update()
+            self.cyc_num[0] += self.substep_comp
+            self.print_info()
+            self.write_ball_info(rec_count, self.gf)
+            rec_count += 1
+            if self.cyc_num[0] >= 300000:
+                break
+
+        self.bdr_max[2] = -self.bdr_min[2]
+        while True:
+            if 'vt' in self.params:
+                self.vt.update_pos(self.gf)
+                self.vt.render(self.gf) 
+            for j in range(self.substep_comp):
+                self.update()
+            self.cyc_num[0] += self.substep_comp
+            self.print_info()
+            self.write_ball_info(rec_count, self.gf)
+            rec_count += 1
+            if self.cyc_num[0] >= 600000:
+                break
 
     def debug(self):
         calm_time = 0
