@@ -275,8 +275,8 @@ class IsoComp(object):
                         self.ratio_stress[2] < 1.0e-3 and
                         ratio_e < 5.0e-7):
                     break
-            self.write_ball_info(save_n, self.gf)
-            self.write_ic_info()
+            # self.write_ball_info(save_n, self.gf)
+            # self.write_ic_info()
             save_n += 1
 
     def pour(self,):
@@ -284,10 +284,10 @@ class IsoComp(object):
         self.vel_lmt[0] = 0.0
         self.vel_lmt[1] = 0.0
         self.vel_lmt[2] = 0.0
-        self.substep_comp = 5000
+        self.substep_comp = 500
         #  calm
         calm_time = 10
-        sub_calm_time = 10000
+        sub_calm_time = 1000
         rec_count = 0
         for i in range(calm_time):
             for j in range(sub_calm_time):
@@ -303,9 +303,9 @@ class IsoComp(object):
                 self.update()
             self.cyc_num[0] += self.substep_comp
             self.print_info()
-            self.write_ball_info(rec_count, self.gf)
+            # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 300000:
+            if self.cyc_num[0] >= 30000:
                 break
 
         self.bdr_max[2] = -self.bdr_min[2]
@@ -317,9 +317,9 @@ class IsoComp(object):
                 self.update()
             self.cyc_num[0] += self.substep_comp
             self.print_info()
-            self.write_ball_info(rec_count, self.gf)
+            # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 600000:
+            if self.cyc_num[0] >= 60000:
                 break
 
     def debug(self):
@@ -382,6 +382,6 @@ class IsoComp(object):
                         self.ratio_stress[2] < 1.0e-3 and
                         ratio_e < 5.0e-7):
                     break
-            self.write_ball_info(save_n, self.gf)
-            self.write_ic_info()
+            # self.write_ball_info(save_n, self.gf)
+            # self.write_ic_info()
             save_n += 1
