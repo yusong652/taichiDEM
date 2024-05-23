@@ -1,7 +1,7 @@
 import taichi as ti
 import math
 
-flt_dtype = ti.f32
+flt_dtype = ti.f64
 
 @ti.data_oriented
 class GridDomain:

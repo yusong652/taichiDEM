@@ -82,20 +82,7 @@ class GrainFiled:
             self.rad[i] = ti.random() * (self.rad_max[0] - self.rad_min[0]) + self.rad_min[0]
             self.mass[i] = self.density[0] * ti.math.pi * self.rad[i] ** 3 * 4 / 3
             self.inertia[i] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0  # Moment of inertia
-        # DEBUG
-        # DEBUG Mode ****************************************
-        #     self.pos[i, 0] = 0.0
-        # # self.pos[0, 0] = 0.0
-        # self.pos[0, 1] = 0.0
-        # self.pos[0, 2] = -0.095
-        # # self.pos[1, 0] = 0.0
-        # self.pos[1, 1] = 0.0
-        # self.pos[1, 2] = 0.095
-        # # self.pos[0, 2] = -0.099
-        # # self.pos[1, 2] = 0.099
-        # self.vel_rot[0, 0] = 10.0
-        # self.vel_rot[1, 0] = 10.0
-        # DEBUG Mode ****************************************
+
         for i, j in ti.ndrange(self.num_ptc, 3):
             self.pos_pre[i, j] = self.pos[i, j]
 

@@ -142,19 +142,26 @@ class IsoComp(object):
         self.time_duration[0] += self.dt[0]
 
     def update(self,):
-        self.ci.clear_contact()
-        self.ci.detect(self.gf, self.gd)
-        self.ci.get_force_normal(self.gf)
-        self.ci.get_force_shear(self.gf)
-        self.stiffness[0] = 0.0
-        self.stiffness[1] = 0.0
-        self.stiffness[2] = 0.0
-        self.ci.apply_bc_comp(self.gf, self)
+        # law of motion
         self.gf.update_acc()
         self.gf.clear_force()
         self.gf.update_vel(self.dt[0])
-        self.ci.get_force_shear_inc(self.gf)
         self.gf.update_pos(self.dt[0])
+
+        # advance time
+        self.update_time()
+
+        # contact detection
+        self.ci.clear_contact()
+        self.ci.detect(self.gf, self.gd)
+
+        # force-displacement law
+        self.ci.get_force_normal(self.gf)
+        # self.ci.get_force_shear_inc(self.gf)
+        self.ci.get_force_shear(self.gf)
+        self.ci.apply_bc_comp(self.gf, self)
+
+        # boundary
         self.get_disp()
         self.get_bdr_min()
         self.get_bdr_max()
@@ -169,7 +176,10 @@ class IsoComp(object):
         self.force[0] = 0.0
         self.force[1] = 0.0
         self.force[2] = 0.0
-        self.update_time()
+        self.stiffness[0] = 0.0
+        self.stiffness[1] = 0.0
+        self.stiffness[2] = 0.0
+        
 
     def print_info(self):
         print("*" * 80)
