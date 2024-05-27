@@ -159,7 +159,7 @@ class IsoComp(object):
         self.ci.get_force_normal(self.gf)
         # self.ci.get_force_shear_inc(self.gf)
         self.ci.get_force_shear(self.gf)
-        self.ci.apply_bc_comp(self.gf, self)
+        self.ci.resolve_ball_wall_force(self.gf, self)
 
         # boundary
         self.get_disp()

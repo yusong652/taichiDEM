@@ -152,7 +152,7 @@ class ContactInfo(object):
         for i, j in ti.ndrange(gd.num_grid, gd.num_grid):  # Parallel
             for k in range(1, gd.num_grid):  # Serial
                 gd.prefix_sum[i, j, k] = gd.prefix_sum[i, j, k - 1] + gd.grain_count[i, j,
-                                                                                     k - 1]
+                k - 1]
         # Record the start point end point in linearly sequenced list (size = num_grid**3)
         # The current list is used to count the number of particle counted in each grid
         for i, j, k in ti.ndrange(gd.num_grid, gd.num_grid, gd.num_grid):  # Parallel
@@ -263,12 +263,12 @@ class ContactInfo(object):
     @ti.func
     def get_force_norm_damp(self, gf: ti.template(), i: ti.i32, j: ti.i32) -> vec:
         rel_pos = vec(gf.pos[j, 0] - gf.pos[i, 0],
-            gf.pos[j, 1] - gf.pos[i, 1],
-            gf.pos[j, 2] - gf.pos[i, 2])
+                      gf.pos[j, 1] - gf.pos[i, 1],
+                      gf.pos[j, 2] - gf.pos[i, 2])
         # Obtain the relative velocity (vec3)
         rel_vel = vec(gf.vel[i, 0] - gf.vel[j, 0],
-            gf.vel[i, 1] - gf.vel[j, 1],
-            gf.vel[i, 2] - gf.vel[j, 2])
+                      gf.vel[i, 1] - gf.vel[j, 1],
+                      gf.vel[i, 2] - gf.vel[j, 2])
         # Distance between two particle
         dist = ti.sqrt(self.normalize(rel_pos))
         gap = dist - gf.rad[i] - gf.rad[j]  # gap = d - 2 * r
@@ -379,7 +379,7 @@ class ContactInfo(object):
         #######################################################################################
         # Shear force # Shear force # Shear force # Shear force # Shear force # Shear Force   #
         #######################################################################################
-        # in parallel 
+        # in parallel
         for i in range(self.n):  # The i-th row
             for index_i in range(self.con_rec_len):  # The index_i-th column
                 if self.contacts[i, index_i] != -1 and i < self.contacts[i, index_i]:  # Particle detected in the detection
@@ -411,8 +411,8 @@ class ContactInfo(object):
                     if index_pre != -1:
                         # Previous shear force transformation by using a quaternion
                         proj_pre = (self.force_s_x_pre[i, index_pre] * normal[0] +
-                            self.force_s_y_pre[i, index_pre] * normal[1] +
-                            self.force_s_z_pre[i, index_pre] * normal[2])
+                                    self.force_s_y_pre[i, index_pre] * normal[1] +
+                                    self.force_s_z_pre[i, index_pre] * normal[2])
                         force_transformed = vec(
                             self.force_s_x_pre[i, index_pre] - normal[0] * proj_pre,
                             self.force_s_y_pre[i, index_pre] - normal[1] * proj_pre,
@@ -488,8 +488,8 @@ class ContactInfo(object):
 
                     # Linear part
                     f_s_trial = vec(self.force_s_x[i, index_i],
-                        self.force_s_y[i, index_i],
-                        self.force_s_z[i, index_i]) + f_s_inc
+                                    self.force_s_y[i, index_i],
+                                    self.force_s_z[i, index_i]) + f_s_inc
 
                     force_s_mod = self.normalize(f_s_trial)
 
@@ -513,7 +513,7 @@ class ContactInfo(object):
                         self.force_s_z[i, index_i] = f_s_trial[2] + f_s_damp[2]
                         self.force_s_x[j, index_j] = - self.force_s_x[i, index_i]
                         self.force_s_y[j, index_j] = - self.force_s_y[i, index_i]
-                        self.force_s_z[j, index_j] = - self.force_s_z[i, index_i]            
+                        self.force_s_z[j, index_j] = - self.force_s_z[i, index_i]
 
                     self.force_s_x_pre[i, index_i] = self.force_s_x[i, index_i]
                     self.force_s_y_pre[i, index_i] = self.force_s_y[i, index_i]
@@ -567,11 +567,9 @@ class ContactInfo(object):
                     gf.moment[j, 2] += moment_j[2]
                 else:
                     break  # -1 detected and there is no contact after this column
-        print(self.force_s_x[0, 0])
-        print(self.contacts[0, 0])
 
     @ti.kernel
-    def apply_bc_comp(self, gf: ti.template(), ic: ti.template()):
+    def resolve_ball_wall_force(self, gf: ti.template(), ic: ti.template()):
         for i in range(gf.num_ptc):
             x = gf.pos[i, 0]
             y = gf.pos[i, 1]
