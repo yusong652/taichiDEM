@@ -21,7 +21,7 @@ class Contact(object):
         self.damp_bb_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_bb_n[0] = 0.7
         self.damp_bb_s = ti.field(dtype=flt_dtype, shape=(1,))
-        self.damp_bb_s[0] = 0.1
+        self.damp_bb_s[0] = 0.0
         self.damp_wb = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_wb[0] = 0.3
         self.con_rec_len = 64
@@ -29,33 +29,35 @@ class Contact(object):
         self.contacts = ti.field(dtype=ti.i32, shape=(self.n, self.con_rec_len),
                                  name="contacts")
         # id of particles in contact in the last cycle
-        self.contacts_pre = ti.field(dtype=ti.i32, shape=(self.n, self.con_rec_len),
-                                     name="contacts_pre")
+        self.contactsPre = ti.field(dtype=ti.i32, shape=(self.n, self.con_rec_len),
+                                    name="contacts_pre")
         # contact number on one particle
         self.contact_count = ti.field(dtype=ti.i32, shape=(self.n,))
-        self.contact_dist_x = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        self.contact_dist_y = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        self.contact_dist_z = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.contactDistX = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.contactDistY = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.contactDistZ = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # shear force components
-        self.force_s_x = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        self.force_s_y = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        self.force_s_z = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearX = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearY = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearZ = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # normal force components
         self.force_n_x = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         self.force_n_y = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         self.force_n_z = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
         # shear force component in the last cycle
-        self.force_s_x_pre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        self.force_s_y_pre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        self.force_s_z_pre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
-        # DEBUG Mode *********************************
-        self.acc_disp = ti.field(dtype=flt_dtype, shape=(1,))
-        self.acc_force = ti.field(dtype=flt_dtype, shape=(1,))
-        # DEBUG Mode *********************************
+        self.forceShearXPre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearYPre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearZPre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+
+        self.contactsWall = ti.field(dtype=flt_dtype, shape=(self.n, 6))
+        self.contactsWallPre = ti.field(dtype=flt_dtype, shape=(self.n, 6))
+        self.forceShearWallXPre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearWallYPre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
+        self.forceShearWallZPre = ti.field(dtype=flt_dtype, shape=(self.n, self.con_rec_len))
 
     def init_contact(self, dt, gf, gd):
         self.contacts.fill(-1)
-        self.contacts_pre.fill(-1)
+        self.contactsPre.fill(-1)
         self.contact_count.fill(0)
         self.dt = dt
         # self.detect(gf, gd)
@@ -69,16 +71,16 @@ class Contact(object):
         """
         # Record the current contact field and initialize the current contact field.
         for i, k in self.contacts:
-            self.contacts_pre[i, k] = self.contacts[i, k]
+            self.contactsPre[i, k] = self.contacts[i, k]
         # Clear the current contact field (size: num_particle * record_len.
         # record_len=16 by default)
         self.contacts.fill(-1)  # Initialize in every cycle
         # Zero the counting list (size: num_particle * 1)
         self.contact_count.fill(0)  # Initialize
-        for i, j in self.force_s_x:
-            self.force_s_x[i, j] = 0.0
-            self.force_s_y[i, j] = 0.0
-            self.force_s_z[i, j] = 0.0
+        for i, j in self.forceShearX:
+            self.forceShearX[i, j] = 0.0
+            self.forceShearY[i, j] = 0.0
+            self.forceShearZ[i, j] = 0.0
 
     @ti.kernel
     def detect(self, gf: ti.template(), gd: ti.template()):
@@ -355,9 +357,9 @@ class Contact(object):
     def get_index_pre(self, i: ti.i32, j: ti.i32) -> ti.i32:
         index_pre = -1
         for l in range(self.con_rec_len):
-            if self.contacts_pre[i, l] == -1:
+            if self.contactsPre[i, l] == -1:
                 break
-            elif self.contacts_pre[i, l] == j:
+            elif self.contactsPre[i, l] == j:
                 index_pre = l
                 break
             else:
@@ -375,7 +377,7 @@ class Contact(object):
         return res
 
     @ti.kernel
-    def get_force_shear(self, gf: ti.template()):
+    def resolve_ball_ball_shear_force(self, gf: ti.template()):
         """
         Transform shear force to the new contact plane
         :param gf: grain field
@@ -404,43 +406,43 @@ class Contact(object):
                     # Normalize the direction (Normalized vec3)
                     normal = rel_pos / dist
                     # Distance of contact point from particle centroid
-                    self.contact_dist_x[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[0]
-                    self.contact_dist_y[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[1]
-                    self.contact_dist_z[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[2]
-                    self.contact_dist_x[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[0]
-                    self.contact_dist_y[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[1]
-                    self.contact_dist_z[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[2]
+                    self.contactDistX[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[0]
+                    self.contactDistY[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[1]
+                    self.contactDistZ[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[2]
+                    self.contactDistX[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[0]
+                    self.contactDistY[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[1]
+                    self.contactDistZ[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[2]
 
                     index_pre = -1
                     index_pre = self.get_index_pre(i, j)
                     if index_pre != -1:
                         # Previous shear force transformation by using a quaternion
-                        proj_pre = (self.force_s_x_pre[i, index_pre] * normal[0] +
-                                    self.force_s_y_pre[i, index_pre] * normal[1] +
-                                    self.force_s_z_pre[i, index_pre] * normal[2])
+                        proj_pre = (self.forceShearXPre[i, index_pre] * normal[0] +
+                                    self.forceShearYPre[i, index_pre] * normal[1] +
+                                    self.forceShearZPre[i, index_pre] * normal[2])
                         force_transformed = vec(
-                            self.force_s_x_pre[i, index_pre] - normal[0] * proj_pre,
-                            self.force_s_y_pre[i, index_pre] - normal[1] * proj_pre,
-                            self.force_s_z_pre[i, index_pre] - normal[2] * proj_pre)
+                            self.forceShearXPre[i, index_pre] - normal[0] * proj_pre,
+                            self.forceShearYPre[i, index_pre] - normal[1] * proj_pre,
+                            self.forceShearZPre[i, index_pre] - normal[2] * proj_pre)
 
-                        self.force_s_x[i, index_i] = force_transformed[0]
-                        self.force_s_y[i, index_i] = force_transformed[1]
-                        self.force_s_z[i, index_i] = force_transformed[2]
-                        self.force_s_x[j, index_j] = - self.force_s_x[i, index_i]
-                        self.force_s_y[j, index_j] = - self.force_s_y[i, index_i]
-                        self.force_s_z[j, index_j] = - self.force_s_z[i, index_i]
+                        self.forceShearX[i, index_i] = force_transformed[0]
+                        self.forceShearY[i, index_i] = force_transformed[1]
+                        self.forceShearZ[i, index_i] = force_transformed[2]
+                        self.forceShearX[j, index_j] = - self.forceShearX[i, index_i]
+                        self.forceShearY[j, index_j] = - self.forceShearY[i, index_i]
+                        self.forceShearZ[j, index_j] = - self.forceShearZ[i, index_i]
                         # print("after: ", self.force_s_x[0, 0],
                         #       self.force_s_y[0, 0],
                         #       self.force_s_z[0, 0])
 
                     else:
                         # Initial state
-                        self.force_s_x[i, index_i] = 0.0
-                        self.force_s_y[i, index_i] = 0.0
-                        self.force_s_z[i, index_i] = 0.0
-                        self.force_s_x[j, index_j] = 0.0
-                        self.force_s_y[j, index_j] = 0.0
-                        self.force_s_z[j, index_j] = 0.0
+                        self.forceShearX[i, index_i] = 0.0
+                        self.forceShearY[i, index_i] = 0.0
+                        self.forceShearZ[i, index_i] = 0.0
+                        self.forceShearX[j, index_j] = 0.0
+                        self.forceShearY[j, index_j] = 0.0
+                        self.forceShearZ[j, index_j] = 0.0
 
                     """
                     damping force
@@ -454,31 +456,31 @@ class Contact(object):
                     # ional velocity and contact distance
                     # The first particle
                     disp_inc_rot_i = vec(gf.vel_rot[i, 1] *
-                                         self.contact_dist_z[i, index_i] -
+                                         self.contactDistZ[i, index_i] -
                                          gf.vel_rot[i, 2] *
-                                         self.contact_dist_y[i, index_i],
+                                         self.contactDistY[i, index_i],
                                          gf.vel_rot[i, 2] *
-                                         self.contact_dist_x[i, index_i] -
+                                         self.contactDistX[i, index_i] -
                                          gf.vel_rot[i, 0] *
-                                         self.contact_dist_z[i, index_i],
+                                         self.contactDistZ[i, index_i],
                                          gf.vel_rot[i, 0] *
-                                         self.contact_dist_y[i, index_i] -
+                                         self.contactDistY[i, index_i] -
                                          gf.vel_rot[i, 1] *
-                                         self.contact_dist_x[i, index_i]) * self.dt
+                                         self.contactDistX[i, index_i]) * self.dt
 
                     # The second particle
                     disp_inc_rot_j = vec(gf.vel_rot[j, 1] *
-                                         self.contact_dist_z[j, index_j] -
+                                         self.contactDistZ[j, index_j] -
                                          gf.vel_rot[j, 2] *
-                                         self.contact_dist_y[j, index_j],
+                                         self.contactDistY[j, index_j],
                                          gf.vel_rot[j, 2] *
-                                         self.contact_dist_x[j, index_j] -
+                                         self.contactDistX[j, index_j] -
                                          gf.vel_rot[j, 0] *
-                                         self.contact_dist_z[j, index_j],
+                                         self.contactDistZ[j, index_j],
                                          gf.vel_rot[j, 0] *
-                                         self.contact_dist_y[j, index_j] -
+                                         self.contactDistY[j, index_j] -
                                          gf.vel_rot[j, 1] *
-                                         self.contact_dist_x[j, index_j]) * self.dt
+                                         self.contactDistX[j, index_j]) * self.dt
 
                     disp_inc_rot = disp_inc_rot_i - disp_inc_rot_j
                     disp_inc = disp_inc_lin + disp_inc_rot
@@ -492,9 +494,9 @@ class Contact(object):
                     f_s_damp = -rel_vel_s * C_s
 
                     # Linear part
-                    f_s_trial = vec(self.force_s_x[i, index_i],
-                                    self.force_s_y[i, index_i],
-                                    self.force_s_z[i, index_i]) + f_s_inc
+                    f_s_trial = vec(self.forceShearX[i, index_i],
+                                    self.forceShearY[i, index_i],
+                                    self.forceShearZ[i, index_i]) + f_s_inc
 
                     force_s_mod = self.get_magnitude(f_s_trial)
 
@@ -506,31 +508,31 @@ class Contact(object):
                     force_s_mod_lim = force_n_mod * self.fric[0]  # Coulomb limit
 
                     if force_s_mod > force_s_mod_lim:
-                        self.force_s_x[i, index_i] = f_s_trial[0]/force_s_mod*force_s_mod_lim
-                        self.force_s_y[i, index_i] = f_s_trial[1]/force_s_mod*force_s_mod_lim
-                        self.force_s_z[i, index_i] = f_s_trial[2]/force_s_mod*force_s_mod_lim
-                        self.force_s_x[j, index_j] = - self.force_s_x[i, index_i]
-                        self.force_s_y[j, index_j] = - self.force_s_y[i, index_i]
-                        self.force_s_z[j, index_j] = - self.force_s_z[i, index_i]
+                        self.forceShearX[i, index_i] = f_s_trial[0] / force_s_mod * force_s_mod_lim
+                        self.forceShearY[i, index_i] = f_s_trial[1] / force_s_mod * force_s_mod_lim
+                        self.forceShearZ[i, index_i] = f_s_trial[2] / force_s_mod * force_s_mod_lim
+                        self.forceShearX[j, index_j] = - self.forceShearX[i, index_i]
+                        self.forceShearY[j, index_j] = - self.forceShearY[i, index_i]
+                        self.forceShearZ[j, index_j] = - self.forceShearZ[i, index_i]
                     else:
-                        self.force_s_x[i, index_i] = f_s_trial[0] + f_s_damp[0]
-                        self.force_s_y[i, index_i] = f_s_trial[1] + f_s_damp[1]
-                        self.force_s_z[i, index_i] = f_s_trial[2] + f_s_damp[2]
-                        self.force_s_x[j, index_j] = - self.force_s_x[i, index_i]
-                        self.force_s_y[j, index_j] = - self.force_s_y[i, index_i]
-                        self.force_s_z[j, index_j] = - self.force_s_z[i, index_i]
+                        self.forceShearX[i, index_i] = f_s_trial[0] + f_s_damp[0]
+                        self.forceShearY[i, index_i] = f_s_trial[1] + f_s_damp[1]
+                        self.forceShearZ[i, index_i] = f_s_trial[2] + f_s_damp[2]
+                        self.forceShearX[j, index_j] = - self.forceShearX[i, index_i]
+                        self.forceShearY[j, index_j] = - self.forceShearY[i, index_i]
+                        self.forceShearZ[j, index_j] = - self.forceShearZ[i, index_i]
 
-                    self.force_s_x_pre[i, index_i] = self.force_s_x[i, index_i]
-                    self.force_s_y_pre[i, index_i] = self.force_s_y[i, index_i]
-                    self.force_s_z_pre[i, index_i] = self.force_s_z[i, index_i]
-                    self.force_s_x_pre[j, index_j] = self.force_s_x[j, index_j]
-                    self.force_s_y_pre[j, index_j] = self.force_s_y[j, index_j]
-                    self.force_s_z_pre[j, index_j] = self.force_s_z[j, index_j]
+                    self.forceShearXPre[i, index_i] = self.forceShearX[i, index_i]
+                    self.forceShearYPre[i, index_i] = self.forceShearY[i, index_i]
+                    self.forceShearZPre[i, index_i] = self.forceShearZ[i, index_i]
+                    self.forceShearXPre[j, index_j] = self.forceShearX[j, index_j]
+                    self.forceShearYPre[j, index_j] = self.forceShearY[j, index_j]
+                    self.forceShearZPre[j, index_j] = self.forceShearZ[j, index_j]
 
 
-                    f_s = vec(self.force_s_x[i, index_i],
-                              self.force_s_y[i, index_i],
-                              self.force_s_z[i, index_i])
+                    f_s = vec(self.forceShearX[i, index_i],
+                              self.forceShearY[i, index_i],
+                              self.forceShearZ[i, index_i])
                     # print("id of ptc: ", i)
                     # print("disp_by_lin: ", disp_inc_lin)
                     # print("disp_by_rot: ", disp_inc_rot)
@@ -546,12 +548,12 @@ class Contact(object):
                     # DEBUG Mode **********************************************************
                     # print(gf.force_s[0, 1])
                     # DEBUG Mode **********************************************************
-                    moment_i = vec(self.contact_dist_y[i, index_i] * f_s[2] -
-                                   self.contact_dist_z[i, index_i] * f_s[1],
-                                   self.contact_dist_z[i, index_i] * f_s[0] -
-                                   self.contact_dist_x[i, index_i] * f_s[2],
-                                   self.contact_dist_x[i, index_i] * f_s[1] -
-                                   self.contact_dist_y[i, index_i] * f_s[0]
+                    moment_i = vec(self.contactDistY[i, index_i] * f_s[2] -
+                                   self.contactDistZ[i, index_i] * f_s[1],
+                                   self.contactDistZ[i, index_i] * f_s[0] -
+                                   self.contactDistX[i, index_i] * f_s[2],
+                                   self.contactDistX[i, index_i] * f_s[1] -
+                                   self.contactDistY[i, index_i] * f_s[0]
                                    )
                     gf.moment[i, 0] += moment_i[0]
                     gf.moment[i, 1] += moment_i[1]
@@ -560,12 +562,12 @@ class Contact(object):
                     # print(gf.f[0, 1] / gf.moment[0, 0])
                     # print(gf.moment[0, 0])
                     # DEBUG Mode **********************************************************
-                    moment_j = vec(self.contact_dist_y[j, index_j] * (-f_s[2]) -
-                                   self.contact_dist_z[j, index_j] * (-f_s[1]),
-                                   self.contact_dist_z[j, index_j] * (-f_s[0]) -
-                                   self.contact_dist_x[j, index_j] * (-f_s[2]),
-                                   self.contact_dist_x[j, index_j] * (-f_s[1]) -
-                                   self.contact_dist_y[j, index_j] * (-f_s[0])
+                    moment_j = vec(self.contactDistY[j, index_j] * (-f_s[2]) -
+                                   self.contactDistZ[j, index_j] * (-f_s[1]),
+                                   self.contactDistZ[j, index_j] * (-f_s[0]) -
+                                   self.contactDistX[j, index_j] * (-f_s[2]),
+                                   self.contactDistX[j, index_j] * (-f_s[1]) -
+                                   self.contactDistY[j, index_j] * (-f_s[0])
                                    )
                     gf.moment[j, 0] += moment_j[0]
                     gf.moment[j, 1] += moment_j[1]
@@ -574,105 +576,45 @@ class Contact(object):
                     break  # -1 detected and there is no contact after this column
 
     @ti.kernel
-    def resolve_ball_wall_force(self, gf: ti.template(), ic: ti.template(), wf: ti.template()):
-        for i in range(gf.num_ptc):
-            x = gf.pos[i, 0]
-            y = gf.pos[i, 1]
-            z = gf.pos[i, 2]
+    def resolve_ball_wall_force(self, particle: ti.template(), compression: ti.template(), wall: ti.template()):
+        for i in range(particle.num_ptc):
+            x = particle.pos[i, 0]
+            y = particle.pos[i, 1]
+            z = particle.pos[i, 2]
             # Gap from the boundary in negative x direction:
-            gap_x_n = x - gf.rad[i] - ic.wallPosMin[0]
-            gap_x_p = -x - gf.rad[i] + ic.wallPosMax[0]
-            gap_y_n = y - gf.rad[i] - ic.wallPosMin[1]
-            gap_y_p = -y - gf.rad[i] + ic.wallPosMax[1]
-            gap_z_n = z - gf.rad[i] - ic.wallPosMin[2]
-            gap_z_p = -z - gf.rad[i] + ic.wallPosMax[2]
+            for j in range(wall.number):
+                pos_dif = vec(particle.pos[i, 0] - wall.position[j, 0],
+                              particle.pos[i, 1] - wall.position[j, 1],
+                              particle.pos[i, 2] - wall.position[j, 2])
+                normal = vec(wall.normal[j, 0], wall.normal[j, 1], wall.normal[j, 2])
+                gap = pos_dif.dot(normal) - particle.rad[i]
+                if gap < 0:
+                    # Normal direction
+                    force_normal = -gap * self.stiff_n[0] * normal
+                    particle.force_n[i, 0] += force_normal[0]
+                    particle.force_n[i, 1] += force_normal[1]
+                    particle.force_n[i, 2] += force_normal[2]
+                    compression.force[0] += force_normal[0]
+                    compression.force[1] += force_normal[1]
+                    compression.force[2] += force_normal[2]
+                    vel_rel_bw = vec(particle.vel[i, 0] - wall.velocity[j, 0],
+                                     particle.vel[i, 1] - wall.velocity[j, 1],
+                                     particle.vel[i, 2] - wall.velocity[j, 2])
+                    vel_rel_norm_mag = vel_rel_bw.dot(normal)
+                    compression.stiffness[0] += self.stiff_n[0] * normal[0]
+                    compression.stiffness[1] += self.stiff_n[0] * normal[1]
+                    compression.stiffness[2] += self.stiff_n[0] * normal[2]
+                    if vel_rel_norm_mag < 0:
+                        M = particle.mass[i]
+                        K = self.stiff_n[0]
+                        C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
+                        V = vel_rel_norm_mag
+                        force_damp_norm = -C * V * normal
+                        particle.force_n[i, 0] += force_damp_norm[0]
+                        particle.force_n[i, 1] += force_damp_norm[1]
+                        particle.force_n[i, 2] += force_damp_norm[2]
+                        compression.force[0] -= C * V
+                        compression.force[1] -= C * V
+                        compression.force[2] -= C * V
 
-            if gap_x_n < 0:
-                gf.force_n[i, 0] -= gap_x_n * self.stiff_n[0]
-                ic.force[0] -= gap_x_n * self.stiff_n[0]
-                vel_rel_bw = gf.vel[i, 0] - ic.vel_tgt[0]
-                if vel_rel_bw < 0:
-                    M = gf.mass[i]
-                    K = self.stiff_n[0]
-                    C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
-                    V = vel_rel_bw
-                    gf.force_n[i, 0] += -C * V
-                    ic.force[0] -= C * V
-                else:
-                    pass
-                ic.stiffness[0] += self.stiff_n[0]
-
-            elif gap_x_p < 0:
-                gf.force_n[i, 0] += gap_x_p * self.stiff_n[0]
-                ic.force[0] -= gap_x_p * self.stiff_n[0]
-                vel_rel_bw = gf.vel[i, 0] - ic.vel_tgt[0]
-                if vel_rel_bw > 0:
-                    M = gf.mass[i]
-                    K = self.stiff_n[0]
-                    C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
-                    V = vel_rel_bw
-                    gf.force_n[i, 0] += -C * V
-                    ic.force[0] += C * V
-                else:
-                    pass
-                ic.stiffness[0] += self.stiff_n[0]
-
-            if gap_y_n < 0:
-                gf.force_n[i, 1] -= gap_y_n * self.stiff_n[0]
-                ic.force[1] -= gap_y_n * self.stiff_n[0]
-                vel_rel_bw = gf.vel[i, 1] - ic.vel_tgt[1]
-                if vel_rel_bw < 0:
-                    M = gf.mass[i]
-                    K = self.stiff_n[0]
-                    C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
-                    V = vel_rel_bw
-                    gf.force_n[i, 1] += -C * V
-                    ic.force[1] -= C * V
-                else:
-                    pass
-                ic.stiffness[1] += self.stiff_n[0]
-
-            elif gap_y_p < 0:
-                gf.force_n[i, 1] += gap_y_p * self.stiff_n[0]
-                ic.force[1] -= gap_y_p * self.stiff_n[0]
-                vel_rel_bw = gf.vel[i, 1] - ic.vel_tgt[1]
-                if vel_rel_bw > 0:
-                    M = gf.mass[i]
-                    K = self.stiff_n[0]
-                    C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
-                    V = vel_rel_bw
-                    gf.force_n[i, 1] += -C * V
-                    ic.force[1] += C * V
-                else:
-                    pass
-                ic.stiffness[1] += self.stiff_n[0]
-
-            if gap_z_n < 0:
-                gf.force_n[i, 2] -= gap_z_n * self.stiff_n[0]
-                ic.force[2] -= gap_z_n * self.stiff_n[0]
-                vel_rel_bw = gf.vel[i, 2] - ic.vel_tgt[2]
-                if vel_rel_bw < 0:
-                    M = gf.mass[i]
-                    K = self.stiff_n[0]
-                    C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
-                    V = vel_rel_bw
-                    gf.force_n[i, 2] += -C * V
-                    ic.force[2] -= C * V
-                else:
-                    pass
-                ic.stiffness[2] += self.stiff_n[0]
-
-            elif gap_z_p < 0:
-                gf.force_n[i, 2] += gap_z_p * self.stiff_n[0]
-                ic.force[2] -= gap_z_p * self.stiff_n[0]
-                vel_rel_bw = gf.vel[i, 2] - ic.vel_tgt[2]
-                if vel_rel_bw > 0:
-                    M = gf.mass[i]
-                    K = self.stiff_n[0]
-                    C = 2. * self.damp_wb[0] * ti.sqrt(K * M)
-                    V = vel_rel_bw
-                    gf.force_n[i, 2] += -C * V
-                    ic.force[2] += C * V
-                else:
-                    pass
-                ic.stiffness[2] += self.stiff_n[0]
+                    # Shear direction

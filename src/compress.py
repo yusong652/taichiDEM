@@ -12,8 +12,8 @@ flt_dtype = ti.f32
 @ti.data_oriented
 class IsoComp(object):
     def __init__(self, gf, ci, gd, vt_is_on, p=2.0e5):
-        self.gf = gf  # grain field
-        self.ci = ci  # contact info
+        self.particle = gf  # grain field
+        self.contact = ci  # contact info
         self.gd = gd  # grid domain
         self.vt_is_on = vt_is_on
         if self.vt_is_on:  # Visual mode on
@@ -60,13 +60,13 @@ class IsoComp(object):
         self.vel_lmt = ti.field(dtype=flt_dtype, shape=3)
 
     def init(self,):
-        self.dt[0] = 0.6 * ti.sqrt(ti.math.pi * 4 / 3 * self.gf.rad_min[0]
-                                   ** 3 * self.gf.density[0] / self.ci.stiff_n[0])
-        self.gf.init_particle(
+        self.dt[0] = 0.6 * ti.sqrt(ti.math.pi * 4 / 3 * self.particle.rad_min[0]
+                                   ** 3 * self.particle.density[0] / self.contact.stiff_n[0])
+        self.particle.init_particle(
             self.wallPosMin[0] + self.len[0] * 0.05, self.wallPosMax[0] - self.len[0] * 0.05,
             self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
-        self.ci.init_contact(self.dt[0], self.gf, self.gd)
+        self.contact.init_contact(self.dt[0], self.particle, self.gd)
         # self.write_ic_info_title()
 
     def write_ic_info_title(self):
@@ -121,7 +121,6 @@ class IsoComp(object):
     def get_disp(self):
         for i in range(3):
             self.disp[i] = - self.dt[0] * self.vel_tgt[i]
-            self.disp_acc[i] += self.disp[i]
 
     def get_len(self):
         self.len[0] = - self.wall.position[0, 0] + self.wall.position[1, 0]
@@ -132,7 +131,7 @@ class IsoComp(object):
         self.volume = self.len[0] * self.len[1] * self.len[2]
 
     def get_e(self):
-        self.e[0] = (self.volume - self.gf.volume_s[0]) / self.gf.volume_s[0]
+        self.e[0] = (self.volume - self.particle.volume_s[0]) / self.particle.volume_s[0]
 
     def get_stress_ratio(self):
         self.ratio_stress[0] = ti.abs((self.stress[0] - self.p_tgt[0]) / self.p_tgt[0])
@@ -144,27 +143,27 @@ class IsoComp(object):
 
     def update(self,):
         # law of motion
-        self.gf.update_acc()
-        self.gf.clear_force()
-        self.gf.update_vel(self.dt[0])
-        self.gf.update_pos(self.dt[0])
+        self.particle.update_acc()
+        self.particle.clear_force()
+        self.particle.update_vel(self.dt[0])
+        self.particle.update_pos(self.dt[0])
 
         # advance time
         self.update_time()
 
         # contact detection
-        self.ci.clear_contact()
-        self.ci.detect(self.gf, self.gd)
+        self.contact.clear_contact()
+        self.contact.detect(self.particle, self.gd)
 
         # force-displacement law
-        self.ci.get_force_normal(self.gf)
+        self.contact.get_force_normal(self.particle)
         # self.ci.get_force_shear_inc(self.gf)
-        self.ci.get_force_shear(self.gf)
-        self.ci.resolve_ball_wall_force(self.gf, self.wall)
+        self.contact.resolve_ball_ball_shear_force(self.particle)
+        self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
 
         # boundary
         # wall
-        self.wall.update_position(timestep=self.ci.dt[0])
+        self.wall.update_position(timestep=self.contact.dt)
         self.get_len()
         self.get_area()
         self.get_stress()
@@ -182,7 +181,7 @@ class IsoComp(object):
 
     def print_info(self):
         print("*" * 80)
-        print("* particle number: ".ljust(25) + str(self.gf.num_ptc))
+        print("* particle number: ".ljust(25) + str(self.particle.num_ptc))
         print("* time duration (s): ".ljust(25) +
               (str(round(self.time_duration[0], 6))).ljust(15))
         print("* timestep (s): ".ljust(25) +
@@ -199,10 +198,7 @@ class IsoComp(object):
               ("%e" % (self.vel_tgt[0] * 1000.0)).ljust(15) +
               ("%e" % (self.vel_tgt[1] * 1000.0)).ljust(15) +
               ("%e" % (self.vel_tgt[2] * 1000.0)).ljust(15))
-        print("* cumulative disp (mm): ".ljust(25) +
-              ("%e" % (self.disp_acc[0] * 1000.0)).ljust(15) +
-              ("%e" % (self.disp_acc[1] * 1000.0)).ljust(15) +
-              ("%e" % (self.disp_acc[2] * 1000.0)).ljust(15))
+
         print("* length (mm): ".ljust(25) +
               ("%e" % (self.len[0] * 1000.0)).ljust(15) +
               ("%e" % (self.len[1] * 1000.0)).ljust(15) +
@@ -230,11 +226,11 @@ class IsoComp(object):
             for j in range(sub_calm_time):
                 self.update()
             print("{} steps finished in calm phase".format(sub_calm_time))
-            self.gf.calm()
+            self.particle.calm()
         while True:
             if self.vt_is_on:
-                self.vt.update_pos(self.gf)
-                self.vt.render(self.gf)
+                self.vt.update_pos(self.particle)
+                self.vt.render(self.particle)
 
             for j in range(self.substep_comp):
                 self.update()
@@ -246,10 +242,11 @@ class IsoComp(object):
                 break
 
         self.wallPosMax[2] = -self.wallPosMin[2]
+        self.wall.position[5, 2] = -self.wall.position[4, 2]
         while True:
-            if 'vt' in self.params:
-                self.vt.update_pos(self.gf)
-                self.vt.render(self.gf) 
+            if self.vt_is_on:
+                self.vt.update_pos(self.particle)
+                self.vt.render(self.particle)
             for j in range(self.substep_comp):
                 self.update()
             self.cyc_num[0] += self.substep_comp

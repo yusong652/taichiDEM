@@ -31,19 +31,19 @@ class Wall:
         self.position[1, 1] = 0.0
         self.position[1, 2] = 0.0
         # walls on y-direction
-        self.position[2, 0] = pos_y_min
-        self.position[2, 1] = 0.0
+        self.position[2, 0] = 0.0
+        self.position[2, 1] = pos_y_min
         self.position[2, 2] = 0.0
-        self.position[3, 0] = pos_y_max
-        self.position[3, 1] = 0.0
+        self.position[3, 0] = 0.0
+        self.position[3, 1] = pos_y_max
         self.position[3, 2] = 0.0
         # walls on z-direction
-        self.position[4, 0] = pos_z_min
+        self.position[4, 0] = 0.0
         self.position[4, 1] = 0.0
-        self.position[4, 2] = 0.0
-        self.position[5, 0] = pos_z_max
+        self.position[4, 2] = pos_z_min
+        self.position[5, 0] = 0.0
         self.position[5, 1] = 0.0
-        self.position[5, 2] = 0.0
+        self.position[5, 2] = pos_z_max
 
     def initialize_box_normal(self, ):
         normal_x = vec(1.0, 0.0, 0.0)
@@ -68,23 +68,19 @@ class Wall:
         self.normal[5, 1] = -normal_z[1]
         self.normal[5, 2] = -normal_z[2]
 
-    @ti.kernel
     def initialize_box_friction(self, fric=0.5):
         for i in range(self.number):
             self.friction[i] = fric
 
-    @ti.kernel
     def initialize_box_stiffness(self, stiff_norm=5.0e7, stiff_shear=1.0e7):
         for i in range(self.number):
             self.stiffnessNorm[i] = stiff_norm
             self.stiffnessShear[i] = stiff_shear
 
-    @ti.kernel
     def initialize_box_dampNRatio(self, damp=0.3):
         for i in range(self.number):
             self.dampNRatio[i] = damp
 
-    @ti.kernel
     def initialize_box_dampSRatio(self, damp=0.3):
         for i in range(self.number):
             self.dampSRatio[i] = damp
@@ -94,7 +90,6 @@ class Wall:
         self.velocity[index_wall, 1] = velocity[1]
         self.velocity[index_wall, 2] = velocity[2]
 
-    @ti.kernel
     def update_position(self, timestep: flt_type):
         for i in range(self.number):
             self.position[i, 0] += self.velocity[i, 0] * timestep
