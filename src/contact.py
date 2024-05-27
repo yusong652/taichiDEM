@@ -5,7 +5,7 @@ vec = ti.math.vec3
 flt_dtype = ti.f32
 
 @ti.data_oriented
-class ContactInfo(object):
+class Contact(object):
     """
     # Allocate fields with fixed size for shear force information storage
     """
@@ -270,7 +270,7 @@ class ContactInfo(object):
                       gf.vel[i, 1] - gf.vel[j, 1],
                       gf.vel[i, 2] - gf.vel[j, 2])
         # Distance between two particle
-        dist = ti.sqrt(self.normalize(rel_pos))
+        dist = ti.sqrt(self.get_magnitude(rel_pos))
         gap = dist - gf.rad[i] - gf.rad[j]  # gap = d - 2 * r
         # Normalize the direction
         normal = rel_pos / dist
@@ -365,8 +365,13 @@ class ContactInfo(object):
         return index_pre
 
     @ti.func
-    def normalize(self, force: vec) -> flt_dtype:
-        res = ti.math.sqrt(force[0]**2 + force[1]**2 + force[2]**2)
+    def get_magnitude(self, force: vec) -> flt_dtype:
+        """
+        Obtain the magnitude of the vector
+        :param n-dimensional vector:
+        :return: magnitude of the vector
+        """
+        res = ti.math.sqrt(force.dot(force))
         return res
 
     @ti.kernel
@@ -394,7 +399,7 @@ class ContactInfo(object):
                                   gf.vel[i, 1] - gf.vel[j, 1],
                                   gf.vel[i, 2] - gf.vel[j, 2])
                     # Distance between two particle (Scalar)
-                    dist = self.normalize(rel_pos)
+                    dist = self.get_magnitude(rel_pos)
                     gap = dist - gf.rad[i] - gf.rad[j]  # gap = d - 2 * r
                     # Normalize the direction (Normalized vec3)
                     normal = rel_pos / dist
@@ -491,12 +496,12 @@ class ContactInfo(object):
                                     self.force_s_y[i, index_i],
                                     self.force_s_z[i, index_i]) + f_s_inc
 
-                    force_s_mod = self.normalize(f_s_trial)
+                    force_s_mod = self.get_magnitude(f_s_trial)
 
                     force_norm_lin = gap * self.stiff_n[0] * normal
                     force_norm_damp = self.get_force_norm_damp(gf, i, j)
                     force_n_total = (force_norm_lin + force_norm_damp)
-                    force_n_mod = self.normalize(force_n_total)
+                    force_n_mod = self.get_magnitude(force_n_total)
 
                     force_s_mod_lim = force_n_mod * self.fric[0]  # Coulomb limit
 
@@ -569,18 +574,18 @@ class ContactInfo(object):
                     break  # -1 detected and there is no contact after this column
 
     @ti.kernel
-    def resolve_ball_wall_force(self, gf: ti.template(), ic: ti.template()):
+    def resolve_ball_wall_force(self, gf: ti.template(), ic: ti.template(), wf: ti.template()):
         for i in range(gf.num_ptc):
             x = gf.pos[i, 0]
             y = gf.pos[i, 1]
             z = gf.pos[i, 2]
             # Gap from the boundary in negative x direction:
-            gap_x_n = x - gf.rad[i] - ic.bdr_min[0]
-            gap_x_p = -x - gf.rad[i] + ic.bdr_max[0]
-            gap_y_n = y - gf.rad[i] - ic.bdr_min[1]
-            gap_y_p = -y - gf.rad[i] + ic.bdr_max[1]
-            gap_z_n = z - gf.rad[i] - ic.bdr_min[2]
-            gap_z_p = -z - gf.rad[i] + ic.bdr_max[2]
+            gap_x_n = x - gf.rad[i] - ic.wallPosMin[0]
+            gap_x_p = -x - gf.rad[i] + ic.wallPosMax[0]
+            gap_y_n = y - gf.rad[i] - ic.wallPosMin[1]
+            gap_y_p = -y - gf.rad[i] + ic.wallPosMax[1]
+            gap_z_n = z - gf.rad[i] - ic.wallPosMin[2]
+            gap_z_p = -z - gf.rad[i] + ic.wallPosMax[2]
 
             if gap_x_n < 0:
                 gf.force_n[i, 0] -= gap_x_n * self.stiff_n[0]

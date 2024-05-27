@@ -1,9 +1,8 @@
 import taichi as ti
-from particle import GrainFiled
-from contact import ContactInfo
+from particle import Particle
+from contact import Contact
 from compress import IsoComp
-from grid import GridDomain
-from visual import VisualTool
+from grid import Domain
 
 
 # initialization
@@ -13,12 +12,11 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.3,
         fast_math=False)
 
 
-gf = GrainFiled(1500)  # Grain field
-ci = ContactInfo(gf.num_ptc)  # Contact info
-gd = GridDomain(num_ptc=gf.num_ptc, rad_max=gf.rad_max[0])  # Grid domain
-vt = VisualTool(n=gf.num_ptc)
+particle = Particle(1500)  # Grain field
+contact = Contact(particle.num_ptc)  # Contact info
+domain = Domain(num_ptc=particle.num_ptc, rad_max=particle.rad_max[0])  # Grid domain
 
-ic = IsoComp(gf, ci, gd, vt=vt)  # Isotropic compression
+ic = IsoComp(particle, contact, domain, vt_is_on=True)  # Isotropic compression
 ic.init()
 if __name__ == "__main__":
     ic.pour()

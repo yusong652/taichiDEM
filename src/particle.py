@@ -4,7 +4,7 @@ vec = ti.math.vec3
 flt_dtype = ti.f32
 
 @ti.data_oriented
-class GrainFiled:
+class Particle:
     def __init__(self, num_ptc):
         self.num_ptc = num_ptc
         self.rad_max = ti.field(dtype=flt_dtype, shape=(1,))
