@@ -5,12 +5,14 @@ flt_dtype = ti.f32
 
 @ti.data_oriented
 class Particle:
-    def __init__(self, num_ptc):
+    def __init__(self, num_ptc, radius_max=0.01, radius_min=0.01):
         self.num_ptc = num_ptc
+        if radius_min > radius_max:
+            raise ValueError('Radius_min can not be larger than radius_max!')
         self.rad_max = ti.field(dtype=flt_dtype, shape=(1,))
-        self.rad_max[0] = 0.002
+        self.rad_max[0] = radius_max
         self.rad_min = ti.field(dtype=flt_dtype, shape=(1,))
-        self.rad_min[0] = 0.008
+        self.rad_min[0] = radius_min
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0 * 1.0
         self.gravity = 9.81 * 10.0

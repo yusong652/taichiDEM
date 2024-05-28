@@ -219,8 +219,8 @@ class IsoComp(object):
         self.vel_lmt[2] = 0.0
         self.substep_comp = 500
         #  calm
-        calm_time = 10
-        sub_calm_time = 1000
+        calm_time = 5
+        sub_calm_time = 3000
         rec_count = 0
         for i in range(calm_time):
             for j in range(sub_calm_time):
@@ -238,7 +238,7 @@ class IsoComp(object):
             self.print_info()
             # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 50000:
+            if self.cyc_num[0] >= 60000:
                 break
 
         self.wallPosMax[2] = -self.wallPosMin[2]
