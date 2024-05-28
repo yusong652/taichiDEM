@@ -1,20 +1,20 @@
 import taichi as ti
+from fmt import flt_dtype
 vec = ti.math.vec3
 
-flt_type = ti.f32
 
 @ti.data_oriented
 class Wall:
     def __init__(self, num_wall, pos_x_min, pos_x_max, pos_y_min, pos_y_max, pos_z_min, pos_z_max):
         self.number = num_wall
-        self.position = ti.field(dtype=flt_type, shape=(num_wall, 3))
-        self.normal = ti.field(dtype=flt_type, shape=(num_wall, 3))
-        self.velocity = ti.field(dtype=flt_type, shape=(num_wall, 3))
-        self.friction = ti.field(dtype=flt_type, shape=(num_wall,))
-        self.stiffnessNorm = ti.field(dtype=flt_type, shape=(num_wall,))
-        self.stiffnessShear = ti.field(dtype=flt_type, shape=(num_wall,))
-        self.dampNRatio = ti.field(dtype=flt_type, shape=(num_wall,))
-        self.dampSRatio = ti.field(dtype=flt_type, shape=(num_wall,))
+        self.position = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.normal = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.velocity = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.friction = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.stiffnessNorm = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.stiffnessShear = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.dampNRatio = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.dampSRatio = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.initialize_box_pos(pos_x_min, pos_x_max, pos_y_min, pos_y_max, pos_z_min, pos_z_max)
         self.initialize_box_normal()
         self.initialize_box_friction()
@@ -90,7 +90,7 @@ class Wall:
         self.velocity[index_wall, 1] = velocity[1]
         self.velocity[index_wall, 2] = velocity[2]
 
-    def update_position(self, timestep: flt_type):
+    def update_position(self, timestep: flt_dtype):
         for i in range(self.number):
             self.position[i, 0] += self.velocity[i, 0] * timestep
             self.position[i, 1] += self.velocity[i, 1] * timestep

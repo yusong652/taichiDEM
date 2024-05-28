@@ -2,12 +2,11 @@ import taichi as ti
 import csv
 import pandas as pd
 import numpy as np
+from fmt import flt_dtype
 from wall import Wall
 from visual import VisualTool
 
 vec = ti.math.vec3
-flt_dtype = ti.f32
-
 
 @ti.data_oriented
 class IsoComp(object):

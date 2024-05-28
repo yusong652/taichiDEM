@@ -1,7 +1,7 @@
 import taichi as ti
 import math
+from fmt import flt_dtype
 
-flt_dtype = ti.f64
 
 @ti.data_oriented
 class Domain:

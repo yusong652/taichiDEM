@@ -3,7 +3,7 @@ from particle import Particle
 from contact import Contact
 from compress import IsoComp
 from grid import Domain
-flt_dtype = ti.f32
+from fmt import flt_dtype
 
 
 # initialization

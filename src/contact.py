@@ -1,8 +1,8 @@
 import taichi as ti
 import numpy as np
-
+from fmt import flt_dtype
 vec = ti.math.vec3
-flt_dtype = ti.f32
+
 
 @ti.data_oriented
 class Contact(object):
