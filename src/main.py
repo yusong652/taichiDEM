@@ -12,7 +12,7 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.3,
         fast_math=False)
 
 
-particle = Particle(1500)  # Grain field
+particle = Particle(4000)  # Grain field
 contact = Contact(particle.num_ptc)  # Contact info
 domain = Domain(num_ptc=particle.num_ptc, rad_max=particle.rad_max[0])  # Grid domain
 

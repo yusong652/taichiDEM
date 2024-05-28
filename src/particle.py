@@ -8,9 +8,9 @@ class Particle:
     def __init__(self, num_ptc):
         self.num_ptc = num_ptc
         self.rad_max = ti.field(dtype=flt_dtype, shape=(1,))
-        self.rad_max[0] = 0.015
+        self.rad_max[0] = 0.002
         self.rad_min = ti.field(dtype=flt_dtype, shape=(1,))
-        self.rad_min[0] = 0.015
+        self.rad_min[0] = 0.008
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0 * 1.0
         self.gravity = 9.81 * 10.0

@@ -158,7 +158,7 @@ class IsoComp(object):
         # force-displacement law
         self.contact.get_force_normal(self.particle)
         # self.ci.get_force_shear_inc(self.gf)
-        self.contact.resolve_ball_ball_shear_force(self.particle)
+        self.contact.resolve_ball_ball_force(self.particle)
         self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
 
         # boundary
@@ -238,7 +238,7 @@ class IsoComp(object):
             self.print_info()
             # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 30000:
+            if self.cyc_num[0] >= 50000:
                 break
 
         self.wallPosMax[2] = -self.wallPosMin[2]
@@ -253,5 +253,5 @@ class IsoComp(object):
             self.print_info()
             # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 60000:
+            if self.cyc_num[0] >= 200000:
                 break
