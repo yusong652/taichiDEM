@@ -1,10 +1,11 @@
 import taichi as ti
 import math
 
+flt_dtype = ti.f64
 
 @ti.data_oriented
-class GridDomain:
-    def __init__(self, num_ptc, rad_max, domain_size=0.5, ):
+class Domain:
+    def __init__(self, num_ptc, rad_max, domain_size=1.0, ):
         self.domain_size = domain_size
         self.num_grid = math.floor(self.domain_size / (rad_max * 2))
         self.size_grid = self.domain_size / self.num_grid  # Simulation domain of size [domain_size]
