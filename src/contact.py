@@ -21,7 +21,7 @@ class Contact(object):
         self.damp_bb_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_bb_n[0] = 0.7
         self.damp_bb_s = ti.field(dtype=flt_dtype, shape=(1,))
-        self.damp_bb_s[0] = 0.0
+        self.damp_bb_s[0] = 0.2
         self.damp_wb = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_wb[0] = 0.3
         self.con_rec_len = 64
