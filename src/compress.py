@@ -219,7 +219,7 @@ class IsoComp(object):
         self.vel_lmt[2] = 0.0
         self.substep_comp = 500
         #  calm
-        calm_time = 5
+        calm_time = 10
         sub_calm_time = 3000
         rec_count = 0
         for i in range(calm_time):
