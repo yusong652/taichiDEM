@@ -1,6 +1,7 @@
 import taichi as ti
 import numpy as np
 import matplotlib.pyplot as plt
+vec = ti.math.vec3
 
 
 @ti.data_oriented
@@ -24,7 +25,7 @@ class VisualTool:
     @ti.kernel
     def update_pos(self, gf: ti.template()):
         for i in range(self.vis_pos.shape[0]):
-            self.vis_pos[i] = [gf.pos[i, 0], gf.pos[i, 1], gf.pos[i, 2]]
+            self.vis_pos[i] = vec(gf.pos[i, 0], gf.pos[i, 1], gf.pos[i, 2])
 
     def render(self, gf: ti.template()):
         # self.camera.track_user_inputs(self.window, movement_speed=0.00, hold_key=ti.ui.RMB)
@@ -34,5 +35,3 @@ class VisualTool:
         self.scene.particles(self.vis_pos, color=(0.7, 0.7, 0.7), radius=gf.rad[0]*0.65)
         self.canvas.scene(self.scene)
         self.window.show()
-
-

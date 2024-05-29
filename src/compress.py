@@ -66,6 +66,18 @@ class IsoComp(object):
             self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
         self.contact.init_contact(self.dt[0], self.particle, self.gd)
+
+        # contact detection
+        self.contact.detect(self.particle, self.gd)
+
+        # force-displacement law
+        self.contact.get_force_normal(self.particle)
+        self.contact.resolve_ball_ball_shear_force(self.particle)
+        self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
+
+        self.contact.clear_contact()
+
+        self.particle.update_acc()
         # self.write_ic_info_title()
 
     def write_ic_info_title(self):
@@ -142,23 +154,25 @@ class IsoComp(object):
 
     def update(self,):
         # law of motion
-        self.particle.update_acc()
-        self.particle.clear_force()
-        self.particle.update_vel(self.dt[0])
         self.particle.update_pos(self.dt[0])
 
-        # advance time
-        self.update_time()
-
         # contact detection
-        self.contact.clear_contact()
         self.contact.detect(self.particle, self.gd)
 
         # force-displacement law
         self.contact.get_force_normal(self.particle)
-        # self.ci.get_force_shear_inc(self.gf)
-        self.contact.resolve_ball_ball_force(self.particle)
+        self.contact.resolve_ball_ball_shear_force(self.particle)
         self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
+        self.contact.clear_contact()
+
+        self.particle.record_acc()
+        self.particle.update_acc()
+        self.particle.clear_force()
+        self.particle.update_vel(self.dt[0])
+
+        # advance time
+        self.update_time()
+
 
         # boundary
         # wall
@@ -237,7 +251,7 @@ class IsoComp(object):
             self.print_info()
             # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 60000:
+            if self.cyc_num[0] >= 50000:
                 break
 
         self.wallPosMax[2] = -self.wallPosMin[2]

@@ -18,8 +18,6 @@ class Particle:
         self.gravity = 9.81 * 10.0
         self.pos = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                             name="position")
-        self.pos_pre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
-                                name="previous position")
         self.grid_idx = ti.field(dtype=ti.i32, shape=(num_ptc, 3),
                                  name="grid_idx")  # id of located grid
         self.mass = ti.field(dtype=flt_dtype, shape=(num_ptc,),
@@ -30,16 +28,16 @@ class Particle:
                                 name="inertial moment")
         self.vel = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                             name="velocity")
-        self.vel_pre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
-                                name="previous velocity")
-        self.vel_rot = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
-                                name="rotational velocity")
-        self.vel_rot_pre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
-                                    name="previous rotational vel")
+        self.velRot = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
+                               name="rotational velocity")
         self.acc = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                             name="acceleration")
-        self.acc_rot = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
-                                name="rotational acceleration")
+        self.accPre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
+                               name="previous acceleration")
+        self.accRot = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
+                               name="rotational acceleration")
+        self.accRotPre = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
+                                  name="previous rotational acceleration")
         self.force_n = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
                                 name="contact normal force")
         self.force_s = ti.field(dtype=flt_dtype, shape=(num_ptc, 3),
@@ -81,13 +79,10 @@ class Particle:
             self.pos[i, 0] = pos[0]
             self.pos[i, 1] = pos[1]
             self.pos[i, 2] = pos[2]
+
             self.rad[i] = ti.random() * (self.rad_max[0] - self.rad_min[0]) + self.rad_min[0]
             self.mass[i] = self.density[0] * ti.math.pi * self.rad[i] ** 3 * 4 / 3
             self.inertia[i] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0  # Moment of inertia
-
-        for i, j in ti.ndrange(self.num_ptc, 3):
-            self.pos_pre[i, j] = self.pos[i, j]
-
         for i in range(self.num_ptc):
             self.volume_s[0] += self.rad[i] ** 3 * 4 / 3 * ti.math.pi
 
@@ -110,7 +105,17 @@ class Particle:
                 #     print(self.force_s[3, 0])
                 # DEBUG Mode *******************************************
                 self.acc[i, j] = self.force[i, j] / self.mass[i]
-                self.acc_rot[i, j] = self.moment[i, j] / self.inertia[i]
+                self.accRot[i, j] = self.moment[i, j] / self.inertia[i]
+
+    @ti.kernel
+    def record_acc(self, ):
+        for i in range(self.num_ptc):
+            self.accPre[i, 0] = self.acc[i, 0]
+            self.accPre[i, 1] = self.acc[i, 1]
+            self.accPre[i, 2] = self.acc[i, 2]
+            self.accRotPre[i, 0] = self.accRot[i, 0]
+            self.accRotPre[i, 1] = self.accRot[i, 1]
+            self.accRotPre[i, 2] = self.accRot[i, 2]
 
     @ti.kernel
     def update_vel(self, dt: flt_dtype):
@@ -124,22 +129,8 @@ class Particle:
         """
         for i in range(self.num_ptc):
             for j in range(3):
-                self.vel_pre[i, j] = self.vel[i, j]
-                self.vel_rot_pre[i, j] = self.vel_rot[i, j]
-        for i in range(self.num_ptc):
-            for j in range(3):
-                self.vel[i, j] += self.acc[i, j] * dt
-                self.vel_rot[i, j] += self.acc_rot[i, j] * dt
-                # DEBUG Mode *********************************
-                # self.vel[i, j] *= 0.9
-                # self.vel[i, j] = 0.0
-                # if i == 3:
-                #     print(self.vel[i, 0])
-                # a = 0.0
-                # a_rot = 0.0
-                # self.v[i, j] = 0.0
-                # DEBUG Mode *********************************
-        # self.vel[0, 1] = 0.0
+                self.vel[i, j] += (self.acc[i, j] + self.accPre[i, j]) / 2.0 * dt
+                self.velRot[i, j] += (self.accRot[i, j] + self.accRotPre[i, j]) / 2.0 * dt
 
     @ti.kernel
     def update_pos(self, dt: flt_dtype):
@@ -150,7 +141,7 @@ class Particle:
         """
         for i in range(self.num_ptc):
             for j in range(3):
-                self.pos[i, j] += self.vel[i, j] * dt
+                self.pos[i, j] += (self.vel[i, j] + self.acc[i, j]*dt/2.0) * dt
 
     @ti.kernel
     def clear_force(self):
@@ -165,12 +156,6 @@ class Particle:
                 self.force_n[i, j] = 0.0
                 self.force_s[i, j] = 0.0
                 self.moment[i, j] = 0.0
-
-    def update(self, dt: flt_dtype):
-        self.update_acc()
-        self.clear_force()
-        self.update_vel(dt)
-        self.update_pos(dt)
 
     @ti.kernel
     def calm(self):

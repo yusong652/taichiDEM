@@ -1,3 +1,3 @@
 import taichi as ti
 
-flt_dtype = ti.f32
+flt_dtype = ti.f64
