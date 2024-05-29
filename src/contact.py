@@ -10,7 +10,7 @@ class Contact(object):
     # Allocate fields with fixed size for shear force information storage
     """
 
-    def __init__(self, n, fric=0.1, stiff_n=5.0e7, stiff_s=2.5e7, ):
+    def __init__(self, n, fric=0.5, stiff_n=5.0e7, stiff_s=2.5e7, ):
         self.n = n  # number of particles or rows for contact info storage
         self.fric = ti.field(dtype=flt_dtype, shape=(1,))
         self.fric[0] = fric
