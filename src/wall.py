@@ -10,6 +10,7 @@ class Wall:
         self.position = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
         self.normal = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
         self.velocity = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.acceleration = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
         self.friction = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.stiffnessNorm = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.stiffnessShear = ti.field(dtype=flt_dtype, shape=(num_wall,))
