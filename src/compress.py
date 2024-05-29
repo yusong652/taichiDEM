@@ -173,7 +173,6 @@ class IsoComp(object):
         # advance time
         self.update_time()
 
-
         # boundary
         # wall
         self.wall.update_position(timestep=self.contact.dt)
