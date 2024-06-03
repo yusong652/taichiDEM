@@ -10,12 +10,12 @@ class Contact(object):
     # Allocate fields with fixed size for shear force information storage
     """
 
-    def __init__(self, n, fric=0.5, stiff_n=2.0e7, stiff_s=1.0e7, ):
+    def __init__(self, n, fric=0.8, stiff_n=2.0e7, stiff_s=1.0e7, ):
         self.n = n  # number of particles or rows for contact info storage
         self.fric = ti.field(dtype=flt_dtype, shape=(1,))
         self.fric[0] = fric
         self.fricBallWall = ti.field(dtype=flt_dtype, shape=(1,))
-        self.fricBallWall[0] = 0.5
+        self.fricBallWall[0] = 0.8
         self.stiff_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiff_n[0] = stiff_n
         self.stiff_s = ti.field(dtype=flt_dtype, shape=(1,))
@@ -268,9 +268,12 @@ class Contact(object):
                       gf.pos[j, 1] - gf.pos[i, 1],
                       gf.pos[j, 2] - gf.pos[i, 2])
         # Obtain the relative velocity (vec3)
-        rel_vel = vec(gf.vel[i, 0] - gf.vel[j, 0],
-                      gf.vel[i, 1] - gf.vel[j, 1],
-                      gf.vel[i, 2] - gf.vel[j, 2])
+        vel_rel = vec((gf.vel[i, 0] + gf.acc[i, 0] / 2.0 * self.dt) -
+                      (gf.vel[j, 0] + gf.acc[j, 0] / 2.0 * self.dt),
+                      (gf.vel[i, 1] + gf.acc[i, 1] / 2.0 * self.dt) -
+                      (gf.vel[j, 1] + gf.acc[j, 1] / 2.0 * self.dt),
+                      (gf.vel[i, 2] + gf.acc[i, 2] / 2.0 * self.dt) -
+                      (gf.vel[j, 2] + gf.acc[j, 2] / 2.0 * self.dt))
         # Distance between two particle
         dist = self.get_magnitude(rel_pos)
         # Normalize the direction
@@ -282,7 +285,7 @@ class Contact(object):
         M = (gf.mass[i] * gf.mass[j]) / (gf.mass[i] + gf.mass[j])
         K = self.stiff_n[0]
         C = 2. * self.damp_bb_n[0] * ti.sqrt(K * M)
-        V = ti.math.dot(rel_vel, normal)
+        V = ti.math.dot(vel_rel, normal)
         force_norm_damp += -C * V * normal
         return force_norm_damp
 
