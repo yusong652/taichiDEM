@@ -10,13 +10,13 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class IsoComp(object):
-    def __init__(self, particle, ci, gd, vt_is_on, p=2.0e5):
-        self.particle = particle  # grain field
+    def __init__(self, gf, ci, gd, vt_is_on, p=2.0e5):
+        self.particle = gf  # grain field
         self.contact = ci  # contact info
         self.gd = gd  # grid domain
         self.vt_is_on = vt_is_on
         if self.vt_is_on:  # Visual mode on
-            self.vt = VisualTool(n=particle.num_ptc)  # visualization tool
+            self.vt = VisualTool(n=gf.num_ptc)  # visualization tool
         else:
             pass
         self.time_duration = ti.field(dtype=flt_dtype ,shape=(1,))
@@ -30,12 +30,12 @@ class IsoComp(object):
         self.p_tgt[0] = self.p_tgt_0[0]
         self.wallPosMin = ti.field(dtype=flt_dtype, shape=3)
         self.wallPosMax = ti.field(dtype=flt_dtype, shape=3)
-        self.wallPosMin[0] = -self.gd.domain_size * 0.45
-        self.wallPosMin[1] = -self.gd.domain_size * 0.45
-        self.wallPosMin[2] = -self.gd.domain_size * 0.15
-        self.wallPosMax[0] = self.gd.domain_size * (-0.18)
-        self.wallPosMax[1] = self.gd.domain_size * 0.48
-        self.wallPosMax[2] = self.gd.domain_size * 0.15
+        self.wallPosMin[0] = -self.gd.domain_size * 0.2
+        self.wallPosMin[1] = -self.gd.domain_size * 0.4
+        self.wallPosMin[2] = -self.gd.domain_size * 0.3
+        self.wallPosMax[0] = self.gd.domain_size * 0.2
+        self.wallPosMax[1] = self.gd.domain_size * 0.4
+        self.wallPosMax[2] = self.gd.domain_size * (-0.1)
         self.len = ti.field(dtype=flt_dtype, shape=3)
         self.len[0] = self.wallPosMax[0] - self.wallPosMin[0]
         self.len[1] = self.wallPosMax[1] - self.wallPosMin[1]
@@ -63,7 +63,7 @@ class IsoComp(object):
                                    ** 3 * self.particle.density[0] / self.contact.stiff_n[0])
         self.particle.init_particle(
             self.wallPosMin[0] + self.len[0] * 0.05, self.wallPosMax[0] - self.len[0] * 0.05,
-            self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.2,
+            self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
         self.contact.init_contact(self.dt[0], self.particle, self.gd)
 
@@ -92,17 +92,11 @@ class IsoComp(object):
             writer.writerow([self.time_duration, self.p_tgt, self.len[0],
                              self.len[1], self.len[2], self.e[0]])
 
-    def write_ball_info(self, save_n, particle):
-        df = pd.DataFrame({'pos_x': particle.pos.to_numpy()[:, 0],
-                           'pos_y': particle.pos.to_numpy()[:, 1],
-                           'pos_z': particle.pos.to_numpy()[:, 2],
-                           'rad': particle.rad.to_numpy(),
-                           'vel_x': particle.vel.to_numpy()[:, 0],
-                           'vel_y': particle.vel.to_numpy()[:, 1],
-                           'vel_z': particle.vel.to_numpy()[:, 2],
-                           'velRot_x': particle.velRot.to_numpy()[:, 0],
-                           'velRot_y': particle.velRot.to_numpy()[:, 1],
-                           'velRot_z': particle.velRot.to_numpy()[:, 2]})
+    def write_ball_info(self, save_n, gf):
+        df = pd.DataFrame({'pos_x': gf.pos.to_numpy()[:, 0],
+                           'pos_y': gf.pos.to_numpy()[:, 1],
+                           'pos_z': gf.pos.to_numpy()[:, 2],
+                           'rad': gf.rad.to_numpy()})
         df.to_csv('ball_info_{}.csv'.format(save_n), index=False)
 
     def get_area(self):
@@ -179,6 +173,7 @@ class IsoComp(object):
         # advance time
         self.update_time()
 
+
         # boundary
         # wall
         self.wall.update_position(timestep=self.contact.dt)
@@ -235,10 +230,10 @@ class IsoComp(object):
         self.vel_lmt[0] = 0.0
         self.vel_lmt[1] = 0.0
         self.vel_lmt[2] = 0.0
-        self.substep_comp = 5000
+        self.substep_comp = 500
         #  calm
-        calm_time = 20
-        sub_calm_time = 5000
+        calm_time = 10
+        sub_calm_time = 3000
         rec_count = 0
         for i in range(calm_time):
             for j in range(sub_calm_time):
@@ -254,13 +249,13 @@ class IsoComp(object):
                 self.update()
             self.cyc_num[0] += self.substep_comp
             self.print_info()
-            self.write_ball_info(rec_count, self.particle)
+            # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 400000:
+            if self.cyc_num[0] >= 50000:
                 break
 
-        self.wallPosMax[0] = self.gd.domain_size*0.48
-        self.wall.position[1, 0] = self.gd.domain_size*0.48
+        self.wallPosMax[2] = -self.wallPosMin[2]
+        self.wall.position[5, 2] = -self.wall.position[4, 2]
         while True:
             if self.vt_is_on:
                 self.vt.update_pos(self.particle)
@@ -269,7 +264,7 @@ class IsoComp(object):
                 self.update()
             self.cyc_num[0] += self.substep_comp
             self.print_info()
-            self.write_ball_info(rec_count, self.particle)
+            # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 2000000:
+            if self.cyc_num[0] >= 200000:
                 break
