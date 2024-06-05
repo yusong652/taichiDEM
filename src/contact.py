@@ -21,12 +21,12 @@ class Contact(object):
         self.damp_bb_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_bb_n[0] = 0.7
         self.damp_bb_s = ti.field(dtype=flt_dtype, shape=(1,))
-        self.damp_bb_s[0] = 0.3
+        self.damp_bb_s[0] = 0.2
         self.damp_wb_n = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_wb_n[0] = 0.5
         self.damp_wb_s = ti.field(dtype=flt_dtype, shape=(1,))
         self.damp_wb_s[0] = 0.3
-        self.con_rec_len = 64
+        self.con_rec_len = 32
         # id of particles in contact
         self.contacts = ti.field(dtype=ti.i32, shape=(self.n, self.con_rec_len),
                                  name="contacts")
@@ -60,7 +60,7 @@ class Contact(object):
         self.forceShearWallYPre = ti.field(dtype=flt_dtype, shape=(self.n, 6))
         self.forceShearWallZPre = ti.field(dtype=flt_dtype, shape=(self.n, 6))
 
-    def init_contact(self, dt, gf, gd):
+    def init_contact(self, dt,):
         self.contacts.fill(-1)
         self.contactsPre.fill(-1)
         self.contact_count.fill(0)
@@ -77,6 +77,12 @@ class Contact(object):
         # Record the current contact field and initialize the current contact field.
         for i, k in self.contacts:
             self.contactsPre[i, k] = self.contacts[i, k]
+
+        # print("contact table pre clear:", self.contactsPre[0, 0], self.contactsPre[0, 1])
+        # print("contact table pre clear:", self.contactsPre[1, 0], self.contactsPre[1, 1])
+        # print("contact table cur clear:", self.contacts[0, 0], self.contacts[0, 1])
+        # print("contact table cur clear:", self.contacts[1, 0], self.contacts[1, 1])
+
         # Clear the current contact field (size: num_particle * record_len.
         # record_len=16 by default)
         self.contacts.fill(-1)  # Initialize in every cycle
@@ -218,11 +224,55 @@ class Contact(object):
                             if i < j:
                                 gap = self.get_gap(gf, i, j)
                                 if gap < 0:  # Particle in contact detected
-                                    self.get_contact(i, j)
+                                    force_norm = self.resolve_ball_ball_normal_force(gf, i, j)
+                                    index_i, index_j = self.get_cur_col(i, j, gf)
+                                    index_pre = self.get_index_pre(i, j)
+                                    self.resolve_ball_ball_shear_force(
+                                        gf, i, j, force_norm, index_i, index_j, index_pre)
+                                    # print("index_i:", index_i)
+                                    # print("index_pre:", index_pre)
+                                    # print(1)
+                                    # print(gf.velRot[0, 0], gf.velRot[0, 1], gf.velRot[0, 2],)
                                 else:
                                     pass
+                                    # print(0)
+                                    # print(gf.velRot[0, 0], gf.velRot[0, 1], gf.velRot[0, 2],)
+                                # print("contact table pre detect:", self.contactsPre[0, 0], self.contactsPre[0, 1])
+                                # print("contact table pre detect:", self.contactsPre[1, 0], self.contactsPre[1, 1])
+                                # print("contact table cur detect:", self.contacts[0, 0], self.contacts[0, 1])
+                                # print("contact table cur detect:", self.contacts[1, 0], self.contacts[1, 1])
                             else:
                                 pass
+
+    @ti.func
+    def resolve_ball_ball_normal_force(self, gf, i, j) -> vec:
+        rel_pos = vec(gf.pos[j, 0] - gf.pos[i, 0],
+                      gf.pos[j, 1] - gf.pos[i, 1],
+                      gf.pos[j, 2] - gf.pos[i, 2])
+        # Obtain the relative velocity (vec3)
+        # Distance between two particle
+        dist = self.get_magnitude(rel_pos)
+        gap = self.get_gap(gf, i, j)
+        # Normalize the direction
+        normal = rel_pos / dist
+        force_norm_lin = vec(normal[0] * gap * self.stiff_n[0],
+                             normal[1] * gap * self.stiff_n[0],
+                             normal[2] * gap * self.stiff_n[0])
+        gf.force_n[i, 0] += force_norm_lin[0]
+        gf.force_n[i, 1] += force_norm_lin[1]
+        gf.force_n[i, 2] += force_norm_lin[2]
+        gf.force_n[j, 0] -= force_norm_lin[0]
+        gf.force_n[j, 1] -= force_norm_lin[1]
+        gf.force_n[j, 2] -= force_norm_lin[2]
+        force_norm_damp = self.get_force_norm_damp(gf, i, j)
+        gf.force_n[i, 0] += force_norm_damp[0]
+        gf.force_n[i, 1] += force_norm_damp[1]
+        gf.force_n[i, 2] += force_norm_damp[2]
+        gf.force_n[j, 0] -= force_norm_damp[0]
+        gf.force_n[j, 1] -= force_norm_damp[1]
+        gf.force_n[j, 2] -= force_norm_damp[2]
+        force_norm = force_norm_lin + force_norm_damp
+        return force_norm
 
     @ti.func
     def get_gap(self, gf: ti.template(), i: ti.i32, j: ti.i32) -> flt_dtype:
@@ -244,7 +294,7 @@ class Contact(object):
         return gap
 
     @ti.func
-    def get_contact(self, i: ti.i32, j: ti.i32):
+    def get_cur_col(self, i: ti.i32, j: ti.i32, gf: ti.template()):
         """
         Append the id of particles to the contact field
         :param i: id of the particle
@@ -259,6 +309,7 @@ class Contact(object):
         index_j = ti.atomic_add(self.contact_count[j], 1)
         self.contacts[j, index_j] = i
 
+        return index_i, index_j
 
     @ti.func
     def get_force_norm_damp(self, gf: ti.template(), i: ti.i32, j: ti.i32) -> vec:
@@ -274,61 +325,12 @@ class Contact(object):
         # Normalize the direction
         normal = rel_pos / dist
         # Damping force
-        # Only collision direction considered (no tension damping force)
-        # if ti.math.dot(rel_pos, rel_vel) > 0:
-        force_norm_damp = vec(0.0, 0.0, 0.0)
-        if ti.math.dot(rel_vel, normal) > 0:
-            M = (gf.mass[i] * gf.mass[j]) / (gf.mass[i] + gf.mass[j])
-            K = self.stiff_n[0]
-            C = 2. * self.damp_bb_n[0] * ti.sqrt(K * M)
-            V = ti.math.dot(rel_vel, normal)
-            force_norm_damp += -C * V * normal
-        else:
-            pass
+        M = (gf.mass[i] * gf.mass[j]) / (gf.mass[i] + gf.mass[j])
+        K = self.stiff_n[0]
+        C = 2. * self.damp_bb_n[0] * ti.sqrt(K * M)
+        V = ti.math.dot(rel_vel, normal)
+        force_norm_damp = -C * V * normal
         return force_norm_damp
-
-    @ti.kernel
-    def get_force_normal(self, gf: ti.template()):
-        """
-        Obtain the normal force based on the overlapping length (-gap)
-        :param gf: grain field
-        :return:
-        """
-        #######################################################################################
-        # Normal force # Normal force # Normal force # Normal force # Normal force # Normal F #
-        #######################################################################################
-        # Obtain the relative position (vec3)
-        for i in range(self.n):
-            for k in range(self.con_rec_len):
-                if self.contacts[i, k] != -1:
-                    if i < self.contacts[i, k]:
-                        j = self.contacts[i, k]
-                        rel_pos = vec(gf.pos[j, 0] - gf.pos[i, 0],
-                                      gf.pos[j, 1] - gf.pos[i, 1],
-                                      gf.pos[j, 2] - gf.pos[i, 2])
-                        # Obtain the relative velocity (vec3)
-                        # Distance between two particle
-                        dist = self.get_magnitude(rel_pos)
-                        gap = self.get_gap(gf, i, j)
-                        # Normalize the direction
-                        normal = rel_pos / dist
-                        gf.force_n[i, 0] += normal[0] * gap * self.stiff_n[0]
-                        gf.force_n[i, 1] += normal[1] * gap * self.stiff_n[0]
-                        gf.force_n[i, 2] += normal[2] * gap * self.stiff_n[0]
-                        gf.force_n[j, 0] -= normal[0] * gap * self.stiff_n[0]
-                        gf.force_n[j, 1] -= normal[1] * gap * self.stiff_n[0]
-                        gf.force_n[j, 2] -= normal[2] * gap * self.stiff_n[0]
-                        force_norm_damp = self.get_force_norm_damp(gf, i, j)
-                        gf.force_n[i, 0] += force_norm_damp[0]
-                        gf.force_n[i, 1] += force_norm_damp[1]
-                        gf.force_n[i, 2] += force_norm_damp[2]
-                        gf.force_n[j, 0] -= force_norm_damp[0]
-                        gf.force_n[j, 1] -= force_norm_damp[1]
-                        gf.force_n[j, 2] -= force_norm_damp[2]
-                    else:  # i is smaller than j.
-                        pass
-                else:  # the contact id after k should be -1
-                    break
 
     @ti.func
     def get_index(self, i: ti.i32, j: ti.i32) -> ti.i32:
@@ -367,7 +369,7 @@ class Contact(object):
         :param n-dimensional vector:
         :return: magnitude of the vector
         """
-        res = ti.math.sqrt(force.dot(force))
+        res = ti.math.sqrt(force[0]**2 + force[1]**2 + force[2]**2)
         return res
 
     @ti.func
@@ -379,8 +381,8 @@ class Contact(object):
             res = vec(0.0, 0.0, 0.0)
         return res
 
-    @ti.kernel
-    def resolve_ball_ball_shear_force(self, gf: ti.template()):
+    @ti.func
+    def resolve_ball_ball_shear_force(self, gf: ti.template(), i, j, force_norm, index_i, index_j, index_pre):
         """
         Transform shear force to the new contact plane
         :param gf: grain field
@@ -390,129 +392,93 @@ class Contact(object):
         # Shear force # Shear force # Shear force # Shear force # Shear force # Shear Force   #
         #######################################################################################
         # in parallel
-        for i in range(self.n):  # The i-th row
-            for index_i in range(self.con_rec_len):  # The index_i-th column
-                if self.contacts[i, index_i] != -1 and i < self.contacts[i, index_i]:  # Particle detected in the detection
-                    j = self.contacts[i, index_i]
-                    index_j = self.get_index(j, i)
-                    # Obtain the relative position (vec3)
-                    pos_rel = vec(gf.pos[j, 0] - gf.pos[i, 0],
-                                  gf.pos[j, 1] - gf.pos[i, 1],
-                                  gf.pos[j, 2] - gf.pos[i, 2])
-                    # Obtain the relative velocity (vec3)
-                    vel_rel = vec(gf.vel[i, 0] - gf.vel[j, 0],
-                                  gf.vel[i, 1] - gf.vel[j, 1],
-                                  gf.vel[i, 2] - gf.vel[j, 2])
-                    # Distance between two particle (Scalar)
-                    dist = self.get_magnitude(pos_rel)
-                    gap = dist - gf.rad[i] - gf.rad[j]  # gap = d - 2 * r
-                    # Normalize the direction (Normalized vec3)
-                    normal = pos_rel / dist
-                    # Distance of contact point from particle centroid
-                    self.contactDistX[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[0]
-                    self.contactDistY[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[1]
-                    self.contactDistZ[i, index_i] = (gf.rad[i] + gap / 2.0) * normal[2]
-                    self.contactDistX[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[0]
-                    self.contactDistY[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[1]
-                    self.contactDistZ[j, index_j] = - (gf.rad[j] + gap / 2.0) * normal[2]
+        pos_rel = vec(gf.pos[j, 0], gf.pos[j, 1], gf.pos[j, 2]) - vec(gf.pos[i, 0], gf.pos[i, 1], gf.pos[i, 2])
+        vel_i = vec(gf.vel[i, 0], gf.vel[i, 1], gf.vel[i, 2])
+        vel_j = vec(gf.vel[j, 0], gf.vel[j, 1], gf.vel[j, 2])
+        vel_rel = vel_i - vel_j
+        # print("vel_rel:", vel_rel)
+        # print("vel_i:", vel_i)
+        # print("vel_j:", vel_j)
+        dist = self.get_magnitude(pos_rel)
+        gap = dist - gf.rad[i] - gf.rad[j]  # gap = d - 2 * r
+        normal = pos_rel / dist
+        contact_dist_i = (gf.rad[i] + gap / 2.0) * normal
+        contact_dist_j = - (gf.rad[j] + gap / 2.0) * normal
+        # print("contact_dist_i", contact_dist_i)
+        # print("contact_dist_j", contact_dist_j)
 
-                    index_pre = -1
-                    index_pre = self.get_index_pre(i, j)
-                    force_transformed = vec(0.0, 0.0, 0.0)
-                    if index_pre != -1:
-                        # Previous shear force transformation
-                        force_shear_pre = vec(self.forceShearXPre[i, index_pre],
-                                              self.forceShearYPre[i, index_pre],
-                                              self.forceShearZPre[i, index_pre])
-                        force_reduced = force_shear_pre - force_shear_pre.dot(normal) * normal
-                        force_transformed = self.normalize(force_reduced) * force_shear_pre.norm()
+        force_transformed = vec(0.0, 0.0, 0.0)
+        if index_pre != -1:
+            # Previous shear force transformation
+            force_shear_pre = vec(self.forceShearXPre[i, index_pre],
+                                  self.forceShearYPre[i, index_pre],
+                                  self.forceShearZPre[i, index_pre])
+            force_reduced = force_shear_pre - force_shear_pre.dot(normal) * normal
+            force_transformed = self.normalize(force_reduced) * force_shear_pre.norm()
+        # Linear relative velocity induced part:
+        vel_rel_shear_lin = vel_rel - vel_rel.dot(normal) * normal
+        vel_rot_i = vec(gf.velRot[i, 0], gf.velRot[i, 1], gf.velRot[i, 2])
+        vel_rot_j = vec(gf.velRot[j, 0], gf.velRot[j, 1], gf.velRot[j, 2])
+        vel_rel_shear_rot = vel_rot_i.cross(contact_dist_i) - vel_rot_j.cross(contact_dist_j)
+        vel_rel_shear = vel_rel_shear_lin + vel_rel_shear_rot
+        # print("normal:", normal)
+        # print("rot_i:", vel_rot_i)
+        # print("rot_j:", vel_rot_j)
+        # print("vel shear lin:", vel_rel_shear_lin)
+        # print("vel shear rot:", vel_rel_shear_rot)
+        disp_inc = vel_rel_shear * self.dt
+        force_shear_inc = - disp_inc * self.stiff_s[0]
+        # Damping shear force
+        M = (gf.mass[i] * gf.mass[j]) / (gf.mass[i] + gf.mass[j])
+        K_s = self.stiff_s[0]
+        C_s = 2. * self.damp_bb_s[0] * ti.sqrt(K_s * M)
+        force_shear_damp = -vel_rel_shear * C_s
 
-                    else:
-                        # Initial state
-                        self.forceShearX[i, index_i] = 0.0
-                        self.forceShearY[i, index_i] = 0.0
-                        self.forceShearZ[i, index_i] = 0.0
-                        self.forceShearX[j, index_j] = 0.0
-                        self.forceShearY[j, index_j] = 0.0
-                        self.forceShearZ[j, index_j] = 0.0
+        # Linear part
+        force_shear_trial = force_transformed + force_shear_inc
+        force_shear_trial_mag = self.get_magnitude(force_shear_trial)
+        force_norm_mag = self.get_magnitude(force_norm)
 
-                    # Linear relative velocity induced part:
-                    vel_rel_shear_lin = vel_rel - vel_rel.dot(normal) * normal
+        force_shear_lin_lim = force_norm_mag * self.fric[0]  # Coulomb limit
+        direction_force_trial = self.normalize(force_shear_trial)
 
-                    # Rotational relative velocity induced part:
-                    # Obtain the rotation induced displacement with cross product of rotat-
-                    # ional velocity and contact distance
-                    # The first particle
-                    vel_rot_i = vec(gf.velRot[i, 0], gf.velRot[i, 1], gf.velRot[i, 2])
-                    vel_rot_j = vec(gf.velRot[j, 0], gf.velRot[j, 1], gf.velRot[j, 2])
-                    contact_dist_i = vec(self.contactDistX[i, index_i],
-                                         self.contactDistY[i, index_i],
-                                         self.contactDistZ[i, index_i])
-                    contact_dist_j = vec(self.contactDistX[j, index_j],
-                                         self.contactDistY[j, index_j],
-                                         self.contactDistZ[j, index_j])
-                    vel_rel_shear_rot = vel_rot_i.cross(contact_dist_i) - vel_rot_j.cross(contact_dist_j)
-                    vel_rel_shear = vel_rel_shear_lin + vel_rel_shear_rot
+        force_shear_lin = vec(0.0, 0.0, 0.0)
+        force_shear_total = vec(0.0, 0.0, 0.0)
+        if force_shear_trial_mag > force_shear_lin_lim:
+            force_shear_lin = direction_force_trial * force_shear_lin_lim
+            # print(direction_force_trial)
 
-                    disp_inc = vel_rel_shear * self.dt
-                    force_shear_inc = - disp_inc * self.stiff_s[0]
+            force_shear_total = force_shear_lin
+        else:
+            force_shear_lin = force_shear_trial
+            force_shear_total = force_shear_lin + force_shear_damp
+        # print("shear:", force_shear_total)
+        # print("norm:", force_norm)
+        self.forceShearXPre[i, index_i] = force_shear_lin[0]
+        self.forceShearYPre[i, index_i] = force_shear_lin[1]
+        self.forceShearZPre[i, index_i] = force_shear_lin[2]
+        self.forceShearXPre[j, index_j] = -force_shear_lin[0]
+        self.forceShearYPre[j, index_j] = -force_shear_lin[1]
+        self.forceShearZPre[j, index_j] = -force_shear_lin[2]
 
-                    # Damping shear force
-                    M = (gf.mass[i] * gf.mass[j]) / (gf.mass[i] + gf.mass[j])
-                    K_s = self.stiff_s[0]
-                    C_s = 2. * self.damp_bb_s[0] * ti.sqrt(K_s * M)
-                    force_shear_damp = -vel_rel_shear * C_s
+        # Force and moment sum
+        gf.force_s[i, 0] += force_shear_total[0]
+        gf.force_s[i, 1] += force_shear_total[1]
+        gf.force_s[i, 2] += force_shear_total[2]
+        gf.force_s[j, 0] -= force_shear_total[0]
+        gf.force_s[j, 1] -= force_shear_total[1]
+        gf.force_s[j, 2] -= force_shear_total[2]
 
-                    # Linear part
-                    force_shear_trial = force_transformed + force_shear_inc
-                    force_shear_trial_mag = self.get_magnitude(force_shear_trial)
-
-                    force_norm_lin = gap * self.stiff_n[0] * normal
-                    force_norm_damp = self.get_force_norm_damp(gf, i, j)
-                    force_norm_total = (force_norm_lin + force_norm_damp)
-                    force_norm_mag = self.get_magnitude(force_norm_total)
-
-                    force_shear_lin_lim = force_norm_mag * self.fric[0]  # Coulomb limit
-                    direction_force_trial = self.normalize(force_shear_trial)
-
-                    force_shear_lin = vec(0.0, 0.0, 0.0)
-                    force_shear_total = vec(0.0, 0.0, 0.0)
-                    if force_shear_trial_mag > force_shear_lin_lim:
-                        force_shear_lin = direction_force_trial * force_shear_lin_lim
-                        force_shear_total = force_shear_lin
-                    else:
-                        force_shear_lin = force_shear_trial
-                        force_shear_total = force_shear_total + force_shear_damp
-
-                    self.forceShearXPre[i, index_i] = force_shear_lin[0]
-                    self.forceShearYPre[i, index_i] = force_shear_lin[1]
-                    self.forceShearZPre[i, index_i] = force_shear_lin[2]
-                    self.forceShearXPre[j, index_j] = -force_shear_lin[0]
-                    self.forceShearYPre[j, index_j] = -force_shear_lin[1]
-                    self.forceShearZPre[j, index_j] = -force_shear_lin[2]
-
-                    # Force and moment sum
-                    gf.force_s[i, 0] += force_shear_total[0]
-                    gf.force_s[i, 1] += force_shear_total[1]
-                    gf.force_s[i, 2] += force_shear_total[2]
-                    gf.force_s[j, 0] -= force_shear_total[0]
-                    gf.force_s[j, 1] -= force_shear_total[1]
-                    gf.force_s[j, 2] -= force_shear_total[2]
-
-                    moment_i = vec(self.contactDistX[i, index_i],
-                                   self.contactDistY[i, index_i],
-                                   self.contactDistZ[i, index_i]).cross(force_shear_total)
-                    gf.moment[i, 0] += moment_i[0]
-                    gf.moment[i, 1] += moment_i[1]
-                    gf.moment[i, 2] += moment_i[2]
-                    moment_j = vec(self.contactDistX[j, index_j],
-                                   self.contactDistY[j, index_j],
-                                   self.contactDistZ[j, index_j]).cross(-force_shear_total)
-                    gf.moment[j, 0] += moment_j[0]
-                    gf.moment[j, 1] += moment_j[1]
-                    gf.moment[j, 2] += moment_j[2]
-                else:
-                    break  # -1 detected and there is no contact after this column
+        moment_i = contact_dist_i.cross(force_shear_total)
+        gf.moment[i, 0] += moment_i[0]
+        gf.moment[i, 1] += moment_i[1]
+        gf.moment[i, 2] += moment_i[2]
+        moment_j = contact_dist_j.cross(-force_shear_total)
+        # print("moment_i:", moment_i)
+        # print("moment_j:", moment_j)
+        gf.moment[j, 0] += moment_j[0]
+        gf.moment[j, 1] += moment_j[1]
+        gf.moment[j, 2] += moment_j[2]
 
     @ti.kernel
     def resolve_ball_wall_force(self, particle: ti.template(), compression: ti.template(), wall: ti.template()):
@@ -544,20 +510,17 @@ class Contact(object):
                     compression.stiffness[1] += self.stiff_n[0] * normal[1]
                     compression.stiffness[2] += self.stiff_n[0] * normal[2]
                     force_normal_damp = vec(0.0, 0.0, 0.0)
-                    if vel_rel_norm_dot < 0:
-                        M = particle.mass[i]
-                        K = self.stiff_n[0]
-                        C = 2. * self.damp_wb_n[0] * ti.sqrt(K * M)
-                        V = vel_rel_norm_dot * normal
-                        force_normal_damp += -C * V
-                        particle.force_n[i, 0] += force_normal_damp[0]
-                        particle.force_n[i, 1] += force_normal_damp[1]
-                        particle.force_n[i, 2] += force_normal_damp[2]
-                        compression.force[0] += abs(force_normal_damp[0])
-                        compression.force[1] += abs(force_normal_damp[1])
-                        compression.force[2] += abs(force_normal_damp[2])
-                    else:
-                        pass
+                    M = particle.mass[i]
+                    K = self.stiff_n[0]
+                    C = 2. * self.damp_wb_n[0] * ti.sqrt(K * M)
+                    V = vel_rel_norm_dot * normal
+                    force_normal_damp += -C * V
+                    particle.force_n[i, 0] += force_normal_damp[0]
+                    particle.force_n[i, 1] += force_normal_damp[1]
+                    particle.force_n[i, 2] += force_normal_damp[2]
+                    compression.force[0] += abs(force_normal_damp[0])
+                    compression.force[1] += abs(force_normal_damp[1])
+                    compression.force[2] += abs(force_normal_damp[2])
                     force_n_total = force_normal_lin + force_normal_damp
                     force_shear_lin_limit = self.get_magnitude(force_n_total) * self.fric[0]
 

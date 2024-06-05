@@ -30,12 +30,12 @@ class IsoComp(object):
         self.p_tgt[0] = self.p_tgt_0[0]
         self.wallPosMin = ti.field(dtype=flt_dtype, shape=3)
         self.wallPosMax = ti.field(dtype=flt_dtype, shape=3)
-        self.wallPosMin[0] = -self.gd.domain_size * 0.2
-        self.wallPosMin[1] = -self.gd.domain_size * 0.4
-        self.wallPosMin[2] = -self.gd.domain_size * 0.3
-        self.wallPosMax[0] = self.gd.domain_size * 0.2
+        self.wallPosMin[0] = -self.gd.domain_size * 0.15
+        self.wallPosMin[1] = -self.gd.domain_size * 0.45
+        self.wallPosMin[2] = -self.gd.domain_size * 0.4
+        self.wallPosMax[0] = self.gd.domain_size * 0.15
         self.wallPosMax[1] = self.gd.domain_size * 0.4
-        self.wallPosMax[2] = self.gd.domain_size * (-0.1)
+        self.wallPosMax[2] = -self.gd.domain_size * 0.15
         self.len = ti.field(dtype=flt_dtype, shape=3)
         self.len[0] = self.wallPosMax[0] - self.wallPosMin[0]
         self.len[1] = self.wallPosMax[1] - self.wallPosMin[1]
@@ -59,25 +59,24 @@ class IsoComp(object):
         self.vel_lmt = ti.field(dtype=flt_dtype, shape=3)
 
     def init(self,):
-        self.dt[0] = 0.6 * ti.sqrt(ti.math.pi * 4 / 3 * self.particle.rad_min[0]
+        self.dt[0] = 0.2 * ti.sqrt(ti.math.pi * 4 / 3 * self.particle.rad_min[0]
                                    ** 3 * self.particle.density[0] / self.contact.stiff_n[0])
         self.particle.init_particle(
             self.wallPosMin[0] + self.len[0] * 0.05, self.wallPosMax[0] - self.len[0] * 0.05,
             self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
-        self.contact.init_contact(self.dt[0], self.particle, self.gd)
+
+        self.contact.init_contact(self.dt[0])
 
         # contact detection
-        self.contact.detect(self.particle, self.gd)
+        # self.contact.detect(self.particle, self.gd)
 
         # force-displacement law
-        self.contact.get_force_normal(self.particle)
-        self.contact.resolve_ball_ball_shear_force(self.particle)
-        self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
+        # self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
 
         self.contact.clear_contact()
 
-        self.particle.update_acc()
+        # self.particle.update_acc()
         # self.write_ic_info_title()
 
     def write_ic_info_title(self):
@@ -160,8 +159,7 @@ class IsoComp(object):
         self.contact.detect(self.particle, self.gd)
 
         # force-displacement law
-        self.contact.get_force_normal(self.particle)
-        self.contact.resolve_ball_ball_shear_force(self.particle)
+        # self.contact.resolve_ball_ball_shear_force(self.particle)
         self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
         self.contact.clear_contact()
 
@@ -232,8 +230,8 @@ class IsoComp(object):
         self.vel_lmt[2] = 0.0
         self.substep_comp = 500
         #  calm
-        calm_time = 10
-        sub_calm_time = 3000
+        calm_time = 20
+        sub_calm_time = 2000
         rec_count = 0
         for i in range(calm_time):
             for j in range(sub_calm_time):
@@ -251,11 +249,11 @@ class IsoComp(object):
             self.print_info()
             # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 50000:
+            if self.cyc_num[0] >= 100000:
                 break
 
         self.wallPosMax[2] = -self.wallPosMin[2]
-        self.wall.position[5, 2] = -self.wall.position[4, 2]
+        self.wall.position[5, 2] = self.gd.domain_size * 0.49
         while True:
             if self.vt_is_on:
                 self.vt.update_pos(self.particle)
@@ -266,5 +264,17 @@ class IsoComp(object):
             self.print_info()
             # self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 200000:
+            if self.cyc_num[0] >= 500000:
                 break
+
+    def test(self):
+        self.vel_lmt[0] = 0.0
+        self.vel_lmt[1] = 0.0
+        self.vel_lmt[2] = 0.0
+        for i in range(10):
+            if self.vt_is_on:
+                self.vt.update_pos(self.particle)
+                self.vt.render(self.particle)
+
+                for i in range(100):
+                    self.update()

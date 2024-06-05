@@ -100,10 +100,6 @@ class Particle:
             for j in range(3):
                 self.force[i, j] += self.force_n[i, j]
                 self.force[i, j] += self.force_s[i, j]
-                # DEBUG Mode *******************************************
-                # if i == 3:
-                #     print(self.force_s[3, 0])
-                # DEBUG Mode *******************************************
                 self.acc[i, j] = self.force[i, j] / self.mass[i]
                 self.accRot[i, j] = self.moment[i, j] / self.inertia[i]
 
@@ -142,6 +138,7 @@ class Particle:
         for i in range(self.num_ptc):
             for j in range(3):
                 self.pos[i, j] += (self.vel[i, j] + self.acc[i, j]*dt/2.0) * dt
+        # print("vel in update:", self.vel[0, 0], self.vel[0, 1], self.vel[0, 2])
 
     @ti.kernel
     def clear_force(self):
