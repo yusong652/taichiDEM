@@ -219,6 +219,7 @@ class Contact(object):
                                 gap = self.get_gap(gf, i, j)
                                 if gap < 0:  # Particle in contact detected
                                     self.get_contact(i, j)
+                                    self.resolve_ball_ball_shear_force()
                                 else:
                                     pass
                             else:
