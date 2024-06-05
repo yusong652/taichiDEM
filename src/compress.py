@@ -82,8 +82,7 @@ class IsoComp(object):
     def write_ic_info_title(self):
         with open('ic_info.csv', 'w') as file:
             writer = csv.writer(file)
-            writer.writerow(['time', 'p', 'len_x',
-                'len_y', 'len_z', 'void_ratio'])
+            writer.writerow(['time', 'p', 'len_x', 'len_y', 'len_z', 'void_ratio'])
 
     def write_ic_info(self):
         with open('ic_info.csv', 'a', newline='') as file:
