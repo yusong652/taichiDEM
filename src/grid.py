@@ -4,7 +4,7 @@ from fmt import flt_dtype
 
 
 @ti.data_oriented
-class Domain:
+class Grid:
     def __init__(self, num_ptc, rad_max, domain_size=1.0, ):
         self.domain_size = domain_size
         self.num_grid = math.floor(self.domain_size / (rad_max * 2))

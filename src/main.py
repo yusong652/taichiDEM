@@ -1,8 +1,5 @@
 import taichi as ti
-from particle import Particle
-from contact import Contact
-from compress import IsoComp
-from grid import Domain
+from heap import Slope
 from fmt import flt_dtype
 
 
@@ -12,12 +9,10 @@ ti.init(arch=ti.gpu, device_memory_fraction=0.5,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
+number_particle = 2000
 
-particle = Particle(80000)  # Grain field
-contact = Contact(particle.num_ptc)  # Contact info
-domain = Domain(num_ptc=particle.num_ptc, rad_max=particle.rad_max[0])  # Grid domain
 
-ic = IsoComp(particle, contact, domain, vt_is_on=True)  # Isotropic compression
+ic = Slope(number_particle, vt_is_on=True)  # Isotropic compression
 ic.init()
 if __name__ == "__main__":
-    ic.pour()
+    ic.run()
