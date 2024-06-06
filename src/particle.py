@@ -138,7 +138,6 @@ class Particle:
         for i in range(self.number):
             for j in range(3):
                 self.pos[i, j] += (self.vel[i, j] + self.acc[i, j]*dt/2.0) * dt
-        # print("vel in update:", self.vel[0, 0], self.vel[0, 1], self.vel[0, 2])
 
     @ti.kernel
     def clear_force(self):

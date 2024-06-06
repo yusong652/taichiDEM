@@ -79,16 +79,8 @@ class Contact(object):
         # Record the current contact field and initialize the current contact field.
         for i, k in self.contacts:
             self.contactsPre[i, k] = self.contacts[i, k]
-
-        # print("contact table pre clear:", self.contactsPre[0, 0], self.contactsPre[0, 1])
-        # print("contact table pre clear:", self.contactsPre[1, 0], self.contactsPre[1, 1])
-        # print("contact table cur clear:", self.contacts[0, 0], self.contacts[0, 1])
-        # print("contact table cur clear:", self.contacts[1, 0], self.contacts[1, 1])
-
-        # Clear the current contact field (size: num_particle * record_len.
-        # record_len=16 by default)
-        self.contacts.fill(-1)  # Initialize in every cycle
-        # Zero the counting list (size: num_particle * 1)
+        self.contacts.fill(-1)  # Renew [num_particle, len_rec]
+        # Zero the counting list [num_particle * 1, None]
         self.contactCounter.fill(0)  # Initialize
         for i, j in self.forceShearX:
             self.forceShearX[i, j] = 0.0
@@ -231,18 +223,8 @@ class Contact(object):
                                     index_pre = self.get_index_pre(i, j)
                                     self.resolve_ball_ball_shear_force(
                                         gf, i, j, force_norm, index_i, index_j, index_pre)
-                                    # print("index_i:", index_i)
-                                    # print("index_pre:", index_pre)
-                                    # print(1)
-                                    # print(gf.velRot[0, 0], gf.velRot[0, 1], gf.velRot[0, 2],)
                                 else:
                                     pass
-                                    # print(0)
-                                    # print(gf.velRot[0, 0], gf.velRot[0, 1], gf.velRot[0, 2],)
-                                # print("contact table pre detect:", self.contactsPre[0, 0], self.contactsPre[0, 1])
-                                # print("contact table pre detect:", self.contactsPre[1, 0], self.contactsPre[1, 1])
-                                # print("contact table cur detect:", self.contacts[0, 0], self.contacts[0, 1])
-                                # print("contact table cur detect:", self.contacts[1, 0], self.contacts[1, 1])
                             else:
                                 pass
 
@@ -398,16 +380,11 @@ class Contact(object):
         vel_i = vec(gf.vel[i, 0], gf.vel[i, 1], gf.vel[i, 2])
         vel_j = vec(gf.vel[j, 0], gf.vel[j, 1], gf.vel[j, 2])
         vel_rel = vel_i - vel_j
-        # print("vel_rel:", vel_rel)
-        # print("vel_i:", vel_i)
-        # print("vel_j:", vel_j)
         dist = self.get_magnitude(pos_rel)
         gap = dist - gf.rad[i] - gf.rad[j]  # gap = d - 2 * r
         normal = pos_rel / dist
         contact_dist_i = (gf.rad[i] + gap / 2.0) * normal
         contact_dist_j = - (gf.rad[j] + gap / 2.0) * normal
-        # print("contact_dist_i", contact_dist_i)
-        # print("contact_dist_j", contact_dist_j)
 
         force_transformed = vec(0.0, 0.0, 0.0)
         if index_pre != -1:
@@ -423,11 +400,6 @@ class Contact(object):
         vel_rot_j = vec(gf.velRot[j, 0], gf.velRot[j, 1], gf.velRot[j, 2])
         vel_rel_shear_rot = vel_rot_i.cross(contact_dist_i) - vel_rot_j.cross(contact_dist_j)
         vel_rel_shear = vel_rel_shear_lin + vel_rel_shear_rot
-        # print("normal:", normal)
-        # print("rot_i:", vel_rot_i)
-        # print("rot_j:", vel_rot_j)
-        # print("vel shear lin:", vel_rel_shear_lin)
-        # print("vel shear rot:", vel_rel_shear_rot)
         disp_inc = vel_rel_shear * self.dt
         force_shear_inc = - disp_inc * self.stiffnessShear[0]
         # Damping shear force
@@ -448,14 +420,10 @@ class Contact(object):
         force_shear_total = vec(0.0, 0.0, 0.0)
         if force_shear_trial_mag > force_shear_lin_lim:
             force_shear_lin = direction_force_trial * force_shear_lin_lim
-            # print(direction_force_trial)
-
             force_shear_total = force_shear_lin
         else:
             force_shear_lin = force_shear_trial
             force_shear_total = force_shear_lin + force_shear_damp
-        # print("shear:", force_shear_total)
-        # print("norm:", force_norm)
         self.forceShearXPre[i, index_i] = force_shear_lin[0]
         self.forceShearYPre[i, index_i] = force_shear_lin[1]
         self.forceShearZPre[i, index_i] = force_shear_lin[2]
@@ -476,8 +444,6 @@ class Contact(object):
         gf.moment[i, 1] += moment_i[1]
         gf.moment[i, 2] += moment_i[2]
         moment_j = contact_dist_j.cross(-force_shear_total)
-        # print("moment_i:", moment_i)
-        # print("moment_j:", moment_j)
         gf.moment[j, 0] += moment_j[0]
         gf.moment[j, 1] += moment_j[1]
         gf.moment[j, 2] += moment_j[2]
@@ -485,9 +451,6 @@ class Contact(object):
     @ti.kernel
     def resolve_ball_wall_force(self, particle: ti.template(), compression: ti.template(), wall: ti.template()):
         for i in range(particle.number):
-            x = particle.pos[i, 0]
-            y = particle.pos[i, 1]
-            z = particle.pos[i, 2]
             # Gap from the boundary in negative x direction:
             for j in range(wall.number):
                 pos_dif = vec(particle.pos[i, 0] - wall.position[j, 0],
@@ -501,16 +464,10 @@ class Contact(object):
                     particle.forceNorm[i, 0] += force_normal_lin[0]
                     particle.forceNorm[i, 1] += force_normal_lin[1]
                     particle.forceNorm[i, 2] += force_normal_lin[2]
-                    compression.force[0] += force_normal_lin[0]
-                    compression.force[1] += force_normal_lin[1]
-                    compression.force[2] += force_normal_lin[2]
                     vel_rel_bw = vec(particle.vel[i, 0] - wall.velocity[j, 0],
                                      particle.vel[i, 1] - wall.velocity[j, 1],
                                      particle.vel[i, 2] - wall.velocity[j, 2])
                     vel_rel_norm_dot = vel_rel_bw.dot(normal)
-                    compression.stiffness[0] += self.stiffnessNorm[0] * normal[0]
-                    compression.stiffness[1] += self.stiffnessNorm[0] * normal[1]
-                    compression.stiffness[2] += self.stiffnessNorm[0] * normal[2]
                     force_normal_damp = vec(0.0, 0.0, 0.0)
                     M = particle.mass[i]
                     K = self.stiffnessNorm[0]
@@ -520,9 +477,6 @@ class Contact(object):
                     particle.forceNorm[i, 0] += force_normal_damp[0]
                     particle.forceNorm[i, 1] += force_normal_damp[1]
                     particle.forceNorm[i, 2] += force_normal_damp[2]
-                    compression.force[0] += abs(force_normal_damp[0])
-                    compression.force[1] += abs(force_normal_damp[1])
-                    compression.force[2] += abs(force_normal_damp[2])
                     force_n_total = force_normal_lin + force_normal_damp
                     force_shear_lin_limit = self.get_magnitude(force_n_total) * self.frictionBallWall[0]
                     # Shear direction
@@ -551,7 +505,6 @@ class Contact(object):
 
                     force_shear_lin = vec(0.0, 0.0, 0.0)
                     force_shear_total = vec(0.0, 0.0, 0.0)
-
                     if force_trial_mag > force_shear_lin_limit:
                         force_shear_lin = direction_trial * force_shear_lin_limit
                         force_shear_total = force_shear_lin
