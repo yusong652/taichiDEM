@@ -21,7 +21,7 @@ class IsoComp(object):
             pass
         self.time_duration = ti.field(dtype=flt_dtype ,shape=(1,))
         self.time_duration[0] = 0.0
-        self.dt = ti.field(dtype=ti.f32, shape=(1,))
+        self.dt = ti.field(dtype=flt_dtype, shape=(1,))
         self.p_tgt_0 = ti.field(dtype=flt_dtype, shape=(1,))
         self.p_tgt_u = ti.field(dtype=flt_dtype, shape=(1,))
         self.p_tgt_u[0] = p
@@ -91,11 +91,11 @@ class IsoComp(object):
             writer.writerow([self.time_duration, self.p_tgt, self.len[0],
                              self.len[1], self.len[2], self.e[0]])
 
-    def write_ball_info(self, save_n, gf):
-        df = pd.DataFrame({'pos_x': gf.pos.to_numpy()[:, 0],
-                           'pos_y': gf.pos.to_numpy()[:, 1],
-                           'pos_z': gf.pos.to_numpy()[:, 2],
-                           'rad': gf.rad.to_numpy()})
+    def write_ball_info(self, save_n, ):
+        df = pd.DataFrame({'pos_x': self.particle.pos.to_numpy()[:, 0],
+                           'pos_y': self.particle.pos.to_numpy()[:, 1],
+                           'pos_z': self.particle.pos.to_numpy()[:, 2],
+                           'rad': self.particle.rad.to_numpy()})
         df.to_csv('ball_info_{}.csv'.format(save_n), index=False)
 
     def get_area(self):
@@ -228,7 +228,7 @@ class IsoComp(object):
         self.vel_lmt[0] = 0.0
         self.vel_lmt[1] = 0.0
         self.vel_lmt[2] = 0.0
-        self.substep_comp = 500
+        self.substep_comp = 5000
         #  calm
         calm_time = 20
         sub_calm_time = 2000
@@ -247,9 +247,9 @@ class IsoComp(object):
                 self.update()
             self.cyc_num[0] += self.substep_comp
             self.print_info()
-            # self.write_ball_info(rec_count, self.gf)
+            self.write_ball_info(rec_count)
             rec_count += 1
-            if self.cyc_num[0] >= 100000:
+            if self.cyc_num[0] >= 400000:
                 break
 
         self.wallPosMax[2] = -self.wallPosMin[2]
@@ -262,9 +262,9 @@ class IsoComp(object):
                 self.update()
             self.cyc_num[0] += self.substep_comp
             self.print_info()
-            # self.write_ball_info(rec_count, self.gf)
+            self.write_ball_info(rec_count, self.gf)
             rec_count += 1
-            if self.cyc_num[0] >= 500000:
+            if self.cyc_num[0] >= 2000000:
                 break
 
     def test(self):
