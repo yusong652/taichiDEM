@@ -14,8 +14,8 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.5,
 
 
 particle = Particle(2000)  # Grain field
-contact = Contact(particle.num_ptc)  # Contact info
-domain = Domain(num_ptc=particle.num_ptc, rad_max=particle.rad_max[0])  # Grid domain
+contact = Contact(particle.number)  # Contact info
+domain = Domain(num_ptc=particle.number, rad_max=particle.radMax[0])  # Grid domain
 
 ic = IsoComp(particle, contact, domain, vt_is_on=True)  # Isotropic compression
 ic.init()
