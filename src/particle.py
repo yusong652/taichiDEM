@@ -14,8 +14,8 @@ class Particle:
         self.radMin = ti.field(dtype=flt_dtype, shape=(1,))
         self.radMin[0] = radius_min
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
-        self.density[0] = 2650.0 * 1.0
-        self.gravity = 9.81 * 10.0
+        self.density[0] = 2650.0
+        self.gravity = 9.81
         self.pos = ti.field(dtype=flt_dtype, shape=(number, 3),
                             name="position")
         self.grid_idx = ti.field(dtype=ti.i32, shape=(number, 3),

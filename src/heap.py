@@ -43,10 +43,15 @@ class Slope(object):
                          self.wallPosMin[2], self.wallPosMax[2])
         self.cyc_num = ti.field(dtype=ti.i32, shape=1)
 
-    def init(self,):
-        self.dt[0] = 0.2 * ti.sqrt(ti.math.pi * 4 / 3 * self.particle.radMin[0]
-                                   ** 3 * self.particle.density[0] / self.contact.stiffnessNorm[0])
+    def get_critical_timestep(self):
+        rad_min = self.particle.radMin[0]
+        mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
+        coefficient = 0.1
+        timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
+        return timestep
 
+    def init(self,):
+        self.dt[0] = self.get_critical_timestep()
         self.contact.init_contact(self.dt[0])
         self.contact.clear_contact()
 
@@ -106,7 +111,7 @@ class Slope(object):
             self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
         calm_time = 20
-        sub_calm_time = 2000
+        sub_calm_time = 4000
         for i in range(calm_time):
             for j in range(sub_calm_time):
                 self.update()
@@ -124,7 +129,7 @@ class Slope(object):
             self.cyc_num[0] += self.substep
             self.print_info()
             # self.write_ball_info(rec_count)
-            if self.cyc_num[0] >= 100000:
+            if self.cyc_num[0] >= 300000:
                 break
 
     def move_wall(self):
@@ -139,7 +144,7 @@ class Slope(object):
             self.cyc_num[0] += self.substep
             self.print_info()
             # self.write_ball_info(rec_count)
-            if self.cyc_num[0] >= 500000:
+            if self.cyc_num[0] >= 1000000:
                 break
 
     def print_info(self):
