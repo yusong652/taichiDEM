@@ -1,6 +1,5 @@
 import taichi as ti
 import math
-from fmt import flt_dtype
 
 
 @ti.data_oriented

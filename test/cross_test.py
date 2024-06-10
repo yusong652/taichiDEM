@@ -38,8 +38,8 @@ class Tester:
 
     @ti.kernel
     def test2(self):
-        vec3 = vec(-1.0, 0.0, 0)
-        res = self.vector.cross(vec3)
+        vec3 = vec(0.0, 0.0, 0.0)
+        res = vec3.dot(self.vector)
         print(res)
 
 

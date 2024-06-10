@@ -9,7 +9,7 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.5,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
-number_particle = 2000
+number_particle = 500
 
 
 ic = Slope(number_particle, vt_is_on=True)  # Isotropic compression

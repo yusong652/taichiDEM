@@ -7,9 +7,9 @@ from wall import Wall
 from visual import VisualTool
 import csv
 import pandas as pd
-import numpy as np
 
 vec = ti.math.vec3
+
 
 @ti.data_oriented
 class Slope(object):
@@ -30,9 +30,9 @@ class Slope(object):
         self.wallPosMax = ti.field(dtype=flt_dtype, shape=3)
         self.wallPosMin[0] = -self.grid.domain_size * 0.15
         self.wallPosMin[1] = -self.grid.domain_size * 0.45
-        self.wallPosMin[2] = -self.grid.domain_size * 0.4
+        self.wallPosMin[2] = -self.grid.domain_size * 0.45
         self.wallPosMax[0] = self.grid.domain_size * 0.15
-        self.wallPosMax[1] = self.grid.domain_size * 0.4
+        self.wallPosMax[1] = self.grid.domain_size * 0.15
         self.wallPosMax[2] = -self.grid.domain_size * 0.15
         self.len = ti.field(dtype=flt_dtype, shape=3)
         self.len[0] = self.wallPosMax[0] - self.wallPosMin[0]
@@ -42,6 +42,7 @@ class Slope(object):
                          self.wallPosMin[1], self.wallPosMax[1],
                          self.wallPosMin[2], self.wallPosMax[2])
         self.cyc_num = ti.field(dtype=ti.i32, shape=1)
+        self.rec_num = ti.field(dtype=ti.i32, shape=1)
 
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
@@ -73,6 +74,12 @@ class Slope(object):
         df = pd.DataFrame({'pos_x': self.particle.pos.to_numpy()[:, 0],
                            'pos_y': self.particle.pos.to_numpy()[:, 1],
                            'pos_z': self.particle.pos.to_numpy()[:, 2],
+                           'vel_x': self.particle.vel.to_numpy()[:, 0],
+                           'vel_y': self.particle.vel.to_numpy()[:, 1],
+                           'vel_z': self.particle.vel.to_numpy()[:, 2],
+                           'velRot_x': self.particle.velRot.to_numpy()[:, 0],
+                           'velRot_y': self.particle.velRot.to_numpy()[:, 1],
+                           'velRot_z': self.particle.velRot.to_numpy()[:, 2],
                            'rad': self.particle.rad.to_numpy()})
         df.to_csv('ball_info_{}.csv'.format(save_n), index=False)
 
@@ -93,7 +100,7 @@ class Slope(object):
         self.particle.update_pos(self.dt[0])
         # contact detection
         self.contact.detect(self.particle, self.grid)
-        self.contact.resolve_ball_wall_force(self.particle, self, self.wall)
+        self.contact.resolve_ball_wall_force(self.particle, self.wall)
         self.contact.clear_contact()
         # particle update
         self.particle.record_acc()
@@ -110,7 +117,7 @@ class Slope(object):
             self.wallPosMin[0] + self.len[0] * 0.05, self.wallPosMax[0] - self.len[0] * 0.05,
             self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
-        calm_time = 20
+        calm_time = 5
         sub_calm_time = 4000
         for i in range(calm_time):
             for j in range(sub_calm_time):
@@ -121,15 +128,15 @@ class Slope(object):
     def aggregate_particles(self):
         while True:
             if self.vt_is_on:
-                self.vt.update_pos(self.particle)
-                self.vt.render(self.particle)
+                self.vt.update(self.particle)
 
             for j in range(self.substep):
                 self.update()
             self.cyc_num[0] += self.substep
+            self.rec_num[0] += 1
             self.print_info()
-            # self.write_ball_info(rec_count)
-            if self.cyc_num[0] >= 300000:
+            # self.write_ball_info(self.rec_num[0])
+            if self.cyc_num[0] >= 30000:
                 break
 
     def move_wall(self):
@@ -137,13 +144,13 @@ class Slope(object):
         self.wallPosMax[2] = self.wall.position[5, 2]
         while True:
             if self.vt_is_on:
-                self.vt.update_pos(self.particle)
-                self.vt.render(self.particle)
+                self.vt.update(self.particle)
             for j in range(self.substep):
                 self.update()
             self.cyc_num[0] += self.substep
+            self.rec_num[0] += 1
             self.print_info()
-            # self.write_ball_info(rec_count)
+            # self.write_ball_info(self.rec_num[0])
             if self.cyc_num[0] >= 1000000:
                 break
 
