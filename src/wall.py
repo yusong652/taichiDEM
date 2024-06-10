@@ -95,3 +95,16 @@ class Wall:
             self.position[i, 0] += self.velocity[i, 0] * timestep
             self.position[i, 1] += self.velocity[i, 1] * timestep
             self.position[i, 2] += self.velocity[i, 2] * timestep
+
+    @ti.func
+    def get_pos(self, i: ti.i32) -> vec:
+        return vec(self.position[i, 0], self.position[i, 1], self.position[i, 2])
+
+    @ti.func
+    def get_vel(self, i: ti.i32) -> vec:
+        return vec(self.velocity[i, 0], self.velocity[i, 1], self.velocity[i, 2])
+
+    @ti.func
+    def get_normal(self, i: ti.i32) -> vec:
+        return vec(self.normal[i, 0], self.normal[i, 1], self.normal[i, 2])
+

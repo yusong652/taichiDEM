@@ -47,7 +47,7 @@ class Slope(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.1
+        coefficient = 0.3
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -136,7 +136,7 @@ class Slope(object):
             self.rec_num[0] += 1
             self.print_info()
             # self.write_ball_info(self.rec_num[0])
-            if self.cyc_num[0] >= 30000:
+            if self.cyc_num[0] >= 200000:
                 break
 
     def move_wall(self):
