@@ -14,7 +14,7 @@ vec = ti.math.vec3
 @ti.data_oriented
 class Slope(object):
     def __init__(self, number_particle, vt_is_on, p=2.0e5):
-        self.substep = 2000
+        self.substep = 10000
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
         self.contact = Contact(self.particle.number)  # contact info
@@ -32,7 +32,7 @@ class Slope(object):
         self.wallPosMin[1] = -self.grid.domain_size * 0.45
         self.wallPosMin[2] = -self.grid.domain_size * 0.4
         self.wallPosMax[0] = self.grid.domain_size * 0.15
-        self.wallPosMax[1] = self.grid.domain_size * 0.4
+        self.wallPosMax[1] = self.grid.domain_size * 0.15
         self.wallPosMax[2] = -self.grid.domain_size * 0.15
         self.len = ti.field(dtype=flt_dtype, shape=3)
         self.len[0] = self.wallPosMax[0] - self.wallPosMin[0]
@@ -42,6 +42,7 @@ class Slope(object):
                          self.wallPosMin[1], self.wallPosMax[1],
                          self.wallPosMin[2], self.wallPosMax[2])
         self.cyc_num = ti.field(dtype=ti.i32, shape=1)
+        self.rec_num = ti.field(dtype=ti.i32, shape=1)
 
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
@@ -110,8 +111,8 @@ class Slope(object):
             self.wallPosMin[0] + self.len[0] * 0.05, self.wallPosMax[0] - self.len[0] * 0.05,
             self.wallPosMin[1] + self.len[1] * 0.05, self.wallPosMax[1] - self.len[1] * 0.05,
             self.wallPosMin[2] + self.len[2] * 0.05, self.wallPosMax[2] - self.len[2] * 0.05)
-        calm_time = 20
-        sub_calm_time = 4000
+        calm_time = 5
+        sub_calm_time = 10000
         for i in range(calm_time):
             for j in range(sub_calm_time):
                 self.update()
@@ -127,9 +128,10 @@ class Slope(object):
             for j in range(self.substep):
                 self.update()
             self.cyc_num[0] += self.substep
+            self.rec_num[0] += 1
             self.print_info()
-            # self.write_ball_info(rec_count)
-            if self.cyc_num[0] >= 300000:
+            self.write_ball_info(self.rec_num[0])
+            if self.cyc_num[0] >= 2000000:
                 break
 
     def move_wall(self):
@@ -142,14 +144,16 @@ class Slope(object):
             for j in range(self.substep):
                 self.update()
             self.cyc_num[0] += self.substep
+            self.rec_num[0] += 1
             self.print_info()
-            # self.write_ball_info(rec_count)
-            if self.cyc_num[0] >= 1000000:
+            self.write_ball_info(self.rec_num[0])
+            if self.cyc_num[0] >= 4000000:
                 break
 
     def print_info(self):
         print("*" * 80)
         print("* particle number: ".ljust(25) + str(self.particle.number))
+        print("* dim_y: ".ljust(25) + str(-self.wall.position[2, 1]+self.wall.position[3, 1]))
         print("* time duration (s): ".ljust(25) +
               (str(round(self.duration[0], 6))).ljust(15))
         print("* timestep (s): ".ljust(25) +

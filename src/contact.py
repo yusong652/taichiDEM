@@ -21,14 +21,14 @@ class Contact(object):
         self.stiffnessShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiffnessShear[0] = stiff_s
         self.dampBallBallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallNorm[0] = 0.7
+        self.dampBallBallNorm[0] = 0.5
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallBallShear[0] = 0.2
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallWallNorm[0] = 0.5
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallWallShear[0] = 0.3
-        self.lenContactRecord = 32
+        self.lenContactRecord = 16
         # id of particles in contact
         self.contacts = ti.field(dtype=ti.i32, shape=(self.n, self.lenContactRecord),
                                  name="contacts")
