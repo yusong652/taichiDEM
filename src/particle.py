@@ -15,7 +15,7 @@ class Particle:
         self.radMin[0] = radius_min
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0
-        self.gravity = 9.81
+        self.gravity = 9.81 * 4.0
         self.pos = ti.field(dtype=flt_dtype, shape=(number, 3),
                             name="position")
         self.grid_idx = ti.field(dtype=ti.i32, shape=(number, 3),
@@ -40,8 +40,6 @@ class Particle:
                                   name="previous rotational acceleration")
         self.forceContact = ti.field(dtype=flt_dtype, shape=(number, 3),
                                      name="contact force")
-        self.force = ti.field(dtype=flt_dtype, shape=(number, 3),
-                              name="contact force")
         self.torque = ti.field(dtype=flt_dtype, shape=(number, 3),
                                name="moment")
         self.volumeSolid = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
@@ -87,17 +85,12 @@ class Particle:
     @ti.kernel
     def update_acc(self, ):
         """
-        Transfer force_n and force_s of each particle to force
         :return: None
         """
+        gravity = vec(0.0, -self.gravity, 0.0)
         for i in range(self.number):
-            # applying gravity
-            self.force[i, 0] = 0.0
-            self.force[i, 1] = -self.gravity * self.mass[i]
-            self.force[i, 2] = -0.0 * self.mass[i]
             for j in range(3):
-                self.force[i, j] += self.forceContact[i, j]
-                self.acc[i, j] = self.force[i, j] / self.mass[i]
+                self.acc[i, j] = self.forceContact[i, j] / self.mass[i] + gravity[j]
                 self.accRot[i, j] = self.torque[i, j] / self.inertia[i]
 
     @ti.kernel
@@ -113,17 +106,14 @@ class Particle:
     @ti.kernel
     def update_vel(self, dt: flt_dtype):
         """
-        Record the rotational and translational velocity to previous
-        velocity field to obtain the initial shear displacement inc-
-        rement between two particles
         Update the velocity and rotational velocity
         :param dt: timestep
         :return: None
         """
         for i in range(self.number):
             for j in range(3):
-                self.vel[i, j] += (self.acc[i, j] + self.accPre[i, j]) / 2.0 * dt
-                self.velRot[i, j] += (self.accRot[i, j] + self.accRotPre[i, j]) / 2.0 * dt
+                self.vel[i, j] += (self.acc[i, j] + self.accPre[i, j]) * 0.5 * dt
+                self.velRot[i, j] += (self.accRot[i, j] + self.accRotPre[i, j]) * 0.5 * dt
 
     @ti.kernel
     def update_pos(self, dt: flt_dtype):
@@ -134,15 +124,13 @@ class Particle:
         """
         for i in range(self.number):
             for j in range(3):
-                self.pos[i, j] += (self.vel[i, j] + self.acc[i, j]*dt/2.0) * dt
+                self.pos[i, j] += (self.vel[i, j] + self.acc[i, j] * dt * 0.5) * dt
 
     @ti.kernel
     def clear_force(self):
         """
-        Clear normal and shear force
-        Contact force in contact resolution process is added
-        to normal and shear force field for each particle
-        :return:
+        Clear resultant force at the end of particle update cycle
+        :return: None
         """
         for i in range(self.number):
             for j in range(3):
@@ -151,12 +139,24 @@ class Particle:
 
     @ti.kernel
     def calm(self):
+        """
+        clear translational and rotational velocity
+        :return:
+        """
         for i in range(self.number):
             for j in range(3):
                 self.vel[i, j] = 0.0
+                self.velRot[i, j] = 0.0
 
     @ti.func
     def add_force_to_ball(self, i: ti.i32, force: vec, torque: vec):
+        """
+
+        :param i: id of the particle
+        :param force: force at the contact point
+        :param torque: torque at the contact point
+        :return: None
+        """
         self.forceContact[i, 0] += force[0]
         self.forceContact[i, 1] += force[1]
         self.forceContact[i, 2] += force[2]
