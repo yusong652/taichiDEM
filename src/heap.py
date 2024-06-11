@@ -13,12 +13,13 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class Slope(object):
-    def __init__(self, number_particle, vt_is_on, p=2.0e5):
+    def __init__(self, number_particle, vt_is_on, log_is_on=False, p=2.0e5):
         self.substep = 2000
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
         self.contact = Contact(self.particle.number)  # contact info
         self.vt_is_on = vt_is_on
+        self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
             self.vt = VisualTool(n=self.particle.number)  # visualization tool
         else:
@@ -80,6 +81,15 @@ class Slope(object):
                            'velRot_x': self.particle.velRot.to_numpy()[:, 0],
                            'velRot_y': self.particle.velRot.to_numpy()[:, 1],
                            'velRot_z': self.particle.velRot.to_numpy()[:, 2],
+                           'acc_x': self.particle.acc.to_numpy()[:, 0],
+                           'acc_y': self.particle.acc.to_numpy()[:, 1],
+                           'acc_z': self.particle.acc.to_numpy()[:, 2],
+                           'accRot_x': self.particle.accRot.to_numpy()[:, 0],
+                           'accRot_y': self.particle.accRot.to_numpy()[:, 1],
+                           'accRot_z': self.particle.accRot.to_numpy()[:, 2],
+                           'forceContact_x': self.particle.forceContact.to_numpy()[:, 0],
+                           'forceContact_y': self.particle.forceContact.to_numpy()[:, 1],
+                           'forceContact_z': self.particle.forceContact.to_numpy()[:, 2],
                            'rad': self.particle.rad.to_numpy()})
         df.to_csv('ball_info_{}.csv'.format(save_n), index=False)
 
@@ -135,7 +145,8 @@ class Slope(object):
             self.cyc_num[0] += self.substep
             self.rec_num[0] += 1
             self.print_info()
-            # self.write_ball_info(self.rec_num[0])
+            if self.log_is_on:
+                self.write_ball_info(self.rec_num[0])
             if self.cyc_num[0] >= 200000:
                 break
 
@@ -150,7 +161,8 @@ class Slope(object):
             self.cyc_num[0] += self.substep
             self.rec_num[0] += 1
             self.print_info()
-            # self.write_ball_info(self.rec_num[0])
+            if self.log_is_on:
+                self.write_ball_info(self.rec_num[0])
             if self.cyc_num[0] >= 1000000:
                 break
 

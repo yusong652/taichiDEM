@@ -5,7 +5,7 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class Particle:
-    def __init__(self, number, radius_max=0.015, radius_min=0.015):
+    def __init__(self, number, radius_max=0.01, radius_min=0.01):
         self.number = number
         if radius_min > radius_max:
             raise ValueError('Radius_min can not be larger than radius_max!')
