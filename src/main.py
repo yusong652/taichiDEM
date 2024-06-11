@@ -9,7 +9,12 @@ ti.init(arch=ti.gpu, device_memory_fraction=0.5,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
+<<<<<<< HEAD
 number_particle = 80000
+=======
+number_particle = 3000
+
+>>>>>>> 601cda1fdee9b06662da81745aca7bbbc36a4689
 
 ic = Slope(number_particle, vt_is_on=True)  # Isotropic compression
 ic.init()
