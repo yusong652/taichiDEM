@@ -5,9 +5,7 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class Particle:
-
-
-    def __init__(self, number, radius_max=0.004, radius_min=0.003):
+    def __init__(self, number, radius_max=0.004, radius_min=0.002):
         self.number = number
         if radius_min > radius_max:
             raise ValueError('Radius_min can not be larger than radius_max!')
@@ -17,7 +15,7 @@ class Particle:
         self.radMin[0] = radius_min
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0
-        self.gravity = 9.81
+        self.gravity = 9.81 * 4.0
         self.pos = ti.field(dtype=flt_dtype, shape=(number, 3),
                             name="position")
         self.grid_idx = ti.field(dtype=ti.i32, shape=(number, 3),
@@ -40,13 +38,11 @@ class Particle:
                                name="rotational acceleration")
         self.accRotPre = ti.field(dtype=flt_dtype, shape=(number, 3),
                                   name="previous rotational acceleration")
-        self.forceNorm = ti.field(dtype=flt_dtype, shape=(number, 3),
-                                  name="contact normal force")
-        self.forceShear = ti.field(dtype=flt_dtype, shape=(number, 3),
-                                   name="contact shear force")
+        self.forceContact = ti.field(dtype=flt_dtype, shape=(number, 3),
+                                     name="contact force")
         self.force = ti.field(dtype=flt_dtype, shape=(number, 3),
                               name="contact force")
-        self.moment = ti.field(dtype=flt_dtype, shape=(number, 3),
+        self.torque = ti.field(dtype=flt_dtype, shape=(number, 3),
                                name="moment")
         self.volumeSolid = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
@@ -100,10 +96,9 @@ class Particle:
             self.force[i, 1] = -self.gravity * self.mass[i]
             self.force[i, 2] = -0.0 * self.mass[i]
             for j in range(3):
-                self.force[i, j] += self.forceNorm[i, j]
-                self.force[i, j] += self.forceShear[i, j]
+                self.force[i, j] += self.forceContact[i, j]
                 self.acc[i, j] = self.force[i, j] / self.mass[i]
-                self.accRot[i, j] = self.moment[i, j] / self.inertia[i]
+                self.accRot[i, j] = self.torque[i, j] / self.inertia[i]
 
     @ti.kernel
     def record_acc(self, ):
@@ -151,13 +146,41 @@ class Particle:
         """
         for i in range(self.number):
             for j in range(3):
-                self.forceNorm[i, j] = 0.0
-                self.forceShear[i, j] = 0.0
-                self.moment[i, j] = 0.0
+                self.forceContact[i, j] = 0.0
+                self.torque[i, j] = 0.0
 
     @ti.kernel
     def calm(self):
         for i in range(self.number):
             for j in range(3):
                 self.vel[i, j] = 0.0
+                self.velRot[i, j] = 0.0
 
+    @ti.func
+    def add_force_to_ball(self, i: ti.i32, force: vec, torque: vec):
+        self.forceContact[i, 0] += force[0]
+        self.forceContact[i, 1] += force[1]
+        self.forceContact[i, 2] += force[2]
+        self.torque[i, 0] += torque[0]
+        self.torque[i, 1] += torque[1]
+        self.torque[i, 2] += torque[2]
+
+    @ti.func
+    def get_radius(self, i: ti.i32) -> flt_dtype:
+        return self.rad[i]
+
+    @ti.func
+    def get_mass(self, i: ti.i32) -> flt_dtype:
+        return self.mass[i]
+
+    @ti.func
+    def get_pos(self, i: ti.i32) -> vec:
+        return vec(self.pos[i, 0], self.pos[i, 1], self.pos[i, 2])
+
+    @ti.func
+    def get_vel(self, i: ti.i32) -> vec:
+        return vec(self.vel[i, 0], self.vel[i, 1], self.vel[i, 2])
+
+    @ti.func
+    def get_vel_rot(self, i: ti.i32) -> vec:
+        return vec(self.velRot[i, 0], self.velRot[i, 1], self.velRot[i, 2])

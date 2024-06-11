@@ -38,10 +38,8 @@ class Tester:
 
     @ti.kernel
     def test2(self):
-        vec3 = vec(-1.0, 0.0, 0)
-        res = self.vector.cross(vec3)
+        res = 1.0
         print(res)
-
 
 tester = Tester()
 tester.test2()

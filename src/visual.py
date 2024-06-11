@@ -23,15 +23,19 @@ class VisualTool:
 
 
     @ti.kernel
-    def update_pos(self, gf: ti.template()):
+    def update_pos(self, particle: ti.template()):
         for i in range(self.vis_pos.shape[0]):
-            self.vis_pos[i] = vec(gf.pos[i, 0], gf.pos[i, 1], gf.pos[i, 2])
+            self.vis_pos[i] = vec(particle.pos[i, 0], particle.pos[i, 1], particle.pos[i, 2])
 
-    def render(self, gf: ti.template()):
+    def render(self, particle: ti.template()):
         # self.camera.track_user_inputs(self.window, movement_speed=0.00, hold_key=ti.ui.RMB)
         self.scene.set_camera(self.camera)
         self.scene.ambient_light((0.8, 0.8, 0.8))
         self.scene.point_light(pos=(1.5, 3.5, 0.3), color=(0.8, 0.8, 0.8))
-        self.scene.particles(self.vis_pos, color=(0.7, 0.7, 0.7), radius=gf.rad[0]*0.65)
+        self.scene.particles(self.vis_pos, color=(0.7, 0.7, 0.7), radius=particle.rad[0] * 0.65)
         self.canvas.scene(self.scene)
         self.window.show()
+
+    def update(self, particle: ti.template()):
+        self.update_pos(particle)
+        self.render(particle)
