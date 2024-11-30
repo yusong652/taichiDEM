@@ -27,11 +27,11 @@ class Contact(object):
         self.dampBallBallNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallBallNorm[0] = 0.5
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallShear[0] = 0.4
+        self.dampBallBallShear[0] = 0.2
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallNorm[0] = 0.7
+        self.dampBallWallNorm[0] = 0.08
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallShear[0] = 0.4
+        self.dampBallWallShear[0] = 0.08
         self.lenContactBallBallRecord = 16
         self.lenContactBallWallRecord = 6
         # id of particles in contact
@@ -110,14 +110,15 @@ class Contact(object):
 
         # Count the number of particle located in every grid parallely
         for i in range(gf.number):
+            # which grid it is located in. ((0, 1, 2) means
+            # the 1st layer, 2nd row, and 3rd column)
             grid_idx = ti.math.floor(vec((gf.pos[i, 0] + gd.domain_size / 2) / gd.size_grid,
                                          (gf.pos[i, 1] + gd.domain_size / 2) / gd.size_grid,
                                          (gf.pos[i, 2] + gd.domain_size / 2) / gd.size_grid),
-                                     int)  # which grid it is located in. ((0, 1, 2) means
-            # the 1st layer, 2nd row, and 3rd column)
+                                     int)  
             # If a particle with id-i is located in the grid, 1 is added to the grain-count
             # field.
-            gd.grain_count[grid_idx] += 1
+            gd.grain_count[grid_idx] += 1  # atomic add by default
 
         # Sum the number of particle in multiple layers to a one-layer-shaped field
         # num_grid indicates the number of grid in each dimension.
@@ -462,7 +463,8 @@ class Contact(object):
                     vs = v_rel - v_rel.dot(normal) * normal
 
                     normal_contact_force = -kn * gap
-                    normal_damping_force = -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+                    # collision damping
+                    normal_damping_force = ti.max(0, -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn)
                     normal_force = (normal_contact_force + normal_damping_force) * normal
 
                     tangOverlapOld = self.get_ball_wall_tang_overlap_old(i, j)
@@ -480,8 +482,8 @@ class Contact(object):
                         tangential_force = trial_ft + tang_damping_force
 
                     Ftotal = normal_force + tangential_force
-                    torque = tangential_force.cross(normal)
-                    particle.add_force_to_ball(i, Ftotal, torque * (rad1 + gap*0.5))
+                    resultant_moment = Ftotal.cross(pos1 - cpos)
+                    particle.add_force_to_ball(i, Ftotal, resultant_moment)
 
                 else:
                     pass
