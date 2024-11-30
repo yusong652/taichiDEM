@@ -189,12 +189,6 @@ class Contact(object):
         #  particle id list arrangement finished ###### particle id list arrangement finished #
         #######################################################################################
 
-        # Brute-force collision detection (Not used here)
-        '''
-        for i in range(n):
-            for j in range(i + 1, n):
-                resolve(i, j)
-        '''
         #######################################################################################
         # Fast collision detection (Adopted here)
         #######################################################################################
@@ -213,7 +207,7 @@ class Contact(object):
             z_begin = ti.max(grid_idx[2] - 1, 0)
             z_end = ti.min(grid_idx[2] + 2, gd.num_grid)
 
-            # Search for the particles in the 27(=3*3*3) neighboring grids
+            # Search for the particles in the 27(=3*3*3) neighbor grids
             for neigh_i in range(x_begin, x_end):
                 for neigh_j in range(y_begin, y_end):
                     for neigh_k in range(z_begin, z_end):
