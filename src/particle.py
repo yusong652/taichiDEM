@@ -5,7 +5,7 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class Particle:
-    def __init__(self, number, radius_max=0.01, radius_min=0.01):
+    def __init__(self, number, radius_max=0.0016, radius_min=0.001):
         self.number = number
         if radius_min > radius_max:
             raise ValueError('Radius_min can not be larger than radius_max!')
@@ -15,9 +15,9 @@ class Particle:
         self.radMin[0] = radius_min
         self.density = ti.field(dtype=flt_dtype, shape=(1,))
         self.density[0] = 2650.0
-        self.gravity = 9.81 * 4.0
         self.pos = ti.field(dtype=flt_dtype, shape=(number, 3),
                             name="position")
+        self.verletDisp = ti.field(dtype=flt_dtype, shape=(number, 3))
         self.grid_idx = ti.field(dtype=ti.i32, shape=(number, 3),
                                  name="grid_idx")  # id of located grid
         self.mass = ti.field(dtype=flt_dtype, shape=(number,),
@@ -26,22 +26,22 @@ class Particle:
                             name="radius")
         self.inertia = ti.field(dtype=flt_dtype, shape=(number,),
                                 name="inertial moment")
+        self.inv_i = ti.field(dtype=flt_dtype, shape=(number,),name="inverse")
         self.vel = ti.field(dtype=flt_dtype, shape=(number, 3),
                             name="velocity")
         self.velRot = ti.field(dtype=flt_dtype, shape=(number, 3),
                                name="rotational velocity")
-        self.acc = ti.field(dtype=flt_dtype, shape=(number, 3),
-                            name="acceleration")
-        self.accPre = ti.field(dtype=flt_dtype, shape=(number, 3),
-                               name="previous acceleration")
-        self.accRot = ti.field(dtype=flt_dtype, shape=(number, 3),
-                               name="rotational acceleration")
-        self.accRotPre = ti.field(dtype=flt_dtype, shape=(number, 3),
-                                  name="previous rotational acceleration")
+        self.acc = ti.field(dtype=flt_dtype, shape=(number, 3))
+        self.angmoment = ti.field(dtype=flt_dtype, shape=(number, 3), name="angular moment")
+
         self.forceContact = ti.field(dtype=flt_dtype, shape=(number, 3),
                                      name="contact force")
         self.torque = ti.field(dtype=flt_dtype, shape=(number, 3),
                                name="moment")
+        self.damp_f = ti.field(dtype=flt_dtype, shape=(1, ),)
+        self.damp_f[0] = 0.0
+        self.damp_t = ti.field(dtype=flt_dtype, shape=(1, ),)
+        self.damp_t[0] = 0.0
         self.volumeSolid = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
     @ti.kernel
@@ -79,59 +79,94 @@ class Particle:
             self.rad[i] = ti.random() * (self.radMax[0] - self.radMin[0]) + self.radMin[0]
             self.mass[i] = self.density[0] * ti.math.pi * self.rad[i] ** 3 * 4 / 3
             self.inertia[i] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0  # Moment of inertia
+            self.inv_i[i] = 1.0 / self.inertia[i]
         for i in range(self.number):
             self.volumeSolid[0] += self.rad[i] ** 3 * 4 / 3 * ti.math.pi
 
-    @ti.kernel
-    def update_acc(self, ):
-        """
-        :return: None
-        """
-        gravity = vec(0.0, -self.gravity, 0.0)
-        for i in range(self.number):
-            for j in range(3):
-                self.acc[i, j] = self.forceContact[i, j] / self.mass[i] + gravity[j]
-                self.accRot[i, j] = self.torque[i, j] / self.inertia[i]
+    @ti.func
+    def damp_resultant_force(self, damp: flt_dtype, resultant_force:vec, vel:vec) -> vec:
+        resultant_force[0] *= 1.0 - damp * ti.math.sign(resultant_force[0]*vel[0])
+        resultant_force[1] *= 1.0 - damp * ti.math.sign(resultant_force[1]*vel[1])
+        resultant_force[2] *= 1.0 - damp * ti.math.sign(resultant_force[2]*vel[2])
+        return resultant_force
 
     @ti.kernel
-    def record_acc(self, ):
-        for i in range(self.number):
-            self.accPre[i, 0] = self.acc[i, 0]
-            self.accPre[i, 1] = self.acc[i, 1]
-            self.accPre[i, 2] = self.acc[i, 2]
-            self.accRotPre[i, 0] = self.accRot[i, 0]
-            self.accRotPre[i, 1] = self.accRot[i, 1]
-            self.accRotPre[i, 2] = self.accRot[i, 2]
-
-    @ti.kernel
-    def update_vel(self, dt: flt_dtype):
+    def update_pos_euler(self, dt: flt_dtype, gravity: vec):
         """
-        Update the velocity and rotational velocity
-        :param dt: timestep
-        :return: None
-        """
-        for i in range(self.number):
-            for j in range(3):
-                self.vel[i, j] += (self.acc[i, j] + self.accPre[i, j]) * 0.5 * dt
-                self.velRot[i, j] += (self.accRot[i, j] + self.accRotPre[i, j]) * 0.5 * dt
-
-    @ti.kernel
-    def update_pos(self, dt: flt_dtype):
-        """
-        The position of particle is updated based on
+        The position of particle is updated based on euler integration
         :param dt:
         :return:
         """
         for i in range(self.number):
-            for j in range(3):
-                self.pos[i, j] += (self.vel[i, j] + self.acc[i, j] * dt * 0.5) * dt
+            fdamp = self.damp_f[0]
+            tdamp = self.damp_t[0]
+            
+            cforce, ctorque = self.get_force_contact(i), self.get_torque_contact(i)
+
+            mass = self.get_mass(i)
+            old_vel, old_disp = self.get_vel(i), self.get_verlet_disp(i)
+            force = self.cundall_damp1st(fdamp, cforce + gravity * mass , old_vel)
+            
+            av = force / mass 
+            vel = old_vel + dt * av
+            delta_x = dt * vel
+            self.set_acc(i, av)
+            self.set_vel(i, vel)
+            x = self.get_pos(i)
+            self.set_pos(i, x + delta_x)
+            self.set_verlet_disp(i, old_disp + delta_x)
+
+            inv_i = self.get_inv_i(i)
+            old_omega = self.get_vel_rot(i)
+
+            torque = self.cundall_damp1st(tdamp, ctorque, old_omega)
+            aw = torque * inv_i 
+            omega = old_omega + dt * aw
+            self.set_vel_rot(i, omega)
+
+    @ti.kernel
+    def update_pos_verlet(self, dt: flt_dtype, gravity: vec):
+        """
+        The position of particle is updated based on Verlet integration
+        :param dt:
+        :return:
+        """
+        for i in range(self.number):
+            fdamp = self.damp_f[0]
+            tdamp = self.damp_t[0]
+            cforce, ctorque = self.get_force_contact(i), self.get_torque_contact(i)
+
+            mass = self.get_mass(i)
+            old_av, old_vel, old_disp = self.get_acc(i), self.get_vel(i), self.get_verlet_disp(i)
+
+            vel_half = old_vel + 0.5 * dt * old_av
+            force = self.cundall_damp1st(fdamp, cforce + gravity * mass , vel_half)
+            delta_x = dt * vel_half 
+            av = force / mass
+            vel = vel_half + 0.5 * av * dt
+            
+            self.set_acc(i, av)
+            self.set_vel(i, vel)
+            x = self.get_pos(i) + delta_x
+            self.set_pos(i, x)
+            self.set_verlet_disp(i, old_disp + delta_x)
+
+            inv_i = self.get_inv_i(i)
+            old_angmoment, old_omega = self.get_angmoment(i), self.get_vel_rot(i)
+
+            torque = self.cundall_damp1st(tdamp, ctorque, old_omega + 0.5 * ctorque * inv_i)
+            angmoment = old_angmoment + 0.5 * torque * dt
+            omega = angmoment * inv_i
+            # dq = dt[None] * SetDQ(old_q, omega)
+            # half_q = old_q + 0.5 * dq
+            angmoment_half = old_angmoment + torque * dt
+            omega_half = angmoment_half * inv_i
+
+            self.set_vel_rot(i, omega_half)
+            self.set_angmoment(i, angmoment_half)
 
     @ti.kernel
     def clear_force(self):
-        """
-        Clear resultant force at the end of particle update cycle
-        :return: None
-        """
         for i in range(self.number):
             for j in range(3):
                 self.forceContact[i, j] = 0.0
@@ -165,6 +200,19 @@ class Particle:
         self.torque[i, 2] += torque[2]
 
     @ti.func
+    def sgn(self, x: flt_dtype) -> flt_dtype:
+        if x != 0:
+            x /= ti.abs(x)
+        return x
+
+    @ti.func
+    def cundall_damp1st(self, damp: flt_dtype, force: vec, vel: vec) -> vec:
+        force[0] *= 1. - damp * self.sgn(force[0] * vel[0])
+        force[1] *= 1. - damp * self.sgn(force[1] * vel[1])
+        force[2] *= 1. - damp * self.sgn(force[2] * vel[2])
+        return force
+
+    @ti.func
     def get_radius(self, i: ti.i32) -> flt_dtype:
         return self.rad[i]
 
@@ -173,13 +221,73 @@ class Particle:
         return self.mass[i]
 
     @ti.func
+    def get_inv_i(self, i: ti.i32) -> flt_dtype:
+        return self.inv_i[i]
+
+    @ti.func
     def get_pos(self, i: ti.i32) -> vec:
         return vec(self.pos[i, 0], self.pos[i, 1], self.pos[i, 2])
+
+    @ti.func
+    def set_pos(self, i: ti.i32, pos: vec):
+        self.pos[i, 0] = pos[0]
+        self.pos[i, 1] = pos[1]
+        self.pos[i, 2] = pos[2]
+
+    @ti.func
+    def get_verlet_disp(self, i: ti.i32) -> vec:
+        return vec(self.verletDisp[i, 0], self.verletDisp[i, 1], self.verletDisp[i, 2])
+
+    @ti.func
+    def set_verlet_disp(self, i: ti.i32, verletDisp: vec):
+        self.verletDisp[i, 0] = verletDisp[0]
+        self.verletDisp[i, 1] = verletDisp[1]
+        self.verletDisp[i, 2] = verletDisp[2]
 
     @ti.func
     def get_vel(self, i: ti.i32) -> vec:
         return vec(self.vel[i, 0], self.vel[i, 1], self.vel[i, 2])
 
     @ti.func
+    def set_vel(self, i: ti.i32, vel: vec):
+        self.vel[i, 0] = vel[0]
+        self.vel[i, 1] = vel[1]
+        self.vel[i, 2] = vel[2]
+
+    @ti.func
     def get_vel_rot(self, i: ti.i32) -> vec:
         return vec(self.velRot[i, 0], self.velRot[i, 1], self.velRot[i, 2])
+
+    @ti.func
+    def set_vel_rot(self, i: ti.i32, velRot: vec):
+        self.velRot[i, 0] = velRot[0]
+        self.velRot[i, 1] = velRot[1]
+        self.velRot[i, 2] = velRot[2]
+
+    @ti.func
+    def get_angmoment(self, i: ti.i32) -> vec:
+        return vec(self.angmoment[i, 0], self.angmoment[i, 1], self.angmoment[i, 2])
+
+    @ti.func 
+    def set_angmoment(self, i: ti.i32, angmoment: vec):
+        self.angmoment[i, 0] = angmoment[0]
+        self.angmoment[i, 1] = angmoment[1]
+        self.angmoment[i, 2] = angmoment[2]
+
+    @ti.func
+    def get_acc(self, i: ti.i32) -> vec:
+        return vec(self.acc[i, 0], self.acc[i, 1], self.acc[i, 2])
+
+    @ti.func
+    def set_acc(self, i: ti.i32, acc: vec):
+        self.acc[i, 0] = acc[0]
+        self.acc[i, 1] = acc[1]
+        self.acc[i, 2] = acc[2]
+
+    @ti.func
+    def get_force_contact(self, i: ti.i32) -> vec:
+        return vec(self.forceContact[i, 0], self.forceContact[i, 1], self.forceContact[i, 2])
+
+    @ti.func
+    def get_torque_contact(self, i: ti.i32) -> vec:
+        return vec(self.torque[i, 0], self.torque[i, 1], self.torque[i, 2])

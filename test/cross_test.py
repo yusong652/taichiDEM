@@ -38,8 +38,11 @@ class Tester:
 
     @ti.kernel
     def test2(self):
-        res = 1.0
-        print(res)
+        v1 = vec(0.1, -1.0, 2.0)
+        v1[0] *= 1.0 - 0.1 * ti.math.sign(0.1)
+        v1[1] *= 1.0 - 0.1 * ti.math.sign(0.1)
+        v1[2] *= 1.0 - 0.1 * ti.math.sign(-0.1)
+        print(v1)
 
 tester = Tester()
 tester.test2()
