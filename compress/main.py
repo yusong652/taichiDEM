@@ -1,5 +1,7 @@
 import taichi as ti
-from heap import Slope
+from compress import Compress
+import sys
+sys.path.append("../src")
 from fmt import flt_dtype
 
 
@@ -9,9 +11,9 @@ ti.init(arch=ti.gpu, device_memory_fraction=0.5,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
-number_particle = 80000
+number_particle = 1024 * 32
 
-ic = Slope(number_particle, vt_is_on=True)  # Isotropic compression
+ic = Compress(number_particle, vt_is_on=False) 
 ic.init()
 if __name__ == "__main__":
     ic.run()
