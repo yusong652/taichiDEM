@@ -1,5 +1,4 @@
 import taichi as ti
-import numpy as np
 from fmt import flt_dtype
 vec = ti.math.vec3
 
@@ -114,7 +113,7 @@ class Contact(object):
                                          (gf.pos[i, 1] + gd.domain_size / 2) / gd.size_grid,
                                          (gf.pos[i, 2] + gd.domain_size / 2) / gd.size_grid),
                                      int)  # which grid it is located in. ((0, 1, 2) means
-            # the 1st layer, 2nd row, and 3rd column)
+            # the 1st layer, 2nd row, and 3rd column
             # If a particle with id-i is located in the grid, 1 is added to the grain-count
             # field.
             gd.grain_count[grid_idx] += 1

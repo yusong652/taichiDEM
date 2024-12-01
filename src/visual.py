@@ -1,6 +1,4 @@
 import taichi as ti
-import numpy as np
-import matplotlib.pyplot as plt
 vec = ti.math.vec3
 
 
