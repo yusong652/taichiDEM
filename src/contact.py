@@ -14,7 +14,7 @@ class Contact(object):
         self.frictionBallBall = ti.field(dtype=flt_dtype, shape=(1,))
         self.frictionBallBall[0] = fric
         self.frictionBallWall = ti.field(dtype=flt_dtype, shape=(1,))
-        self.frictionBallWall[0] = 0.5
+        self.frictionBallWall[0] = 0.0
         self.stiffnessNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiffnessNorm[0] = stiff_n
         self.stiffnessNormWall = ti.field(dtype=flt_dtype, shape=(1,))
@@ -24,13 +24,13 @@ class Contact(object):
         self.stiffnessShearWall = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiffnessShearWall[0] = stiff_s
         self.dampBallBallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallNorm[0] = 0.5
+        self.dampBallBallNorm[0] = 0.7
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallShear[0] = 0.2
+        self.dampBallBallShear[0] = 0.3
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallNorm[0] = 0.08
+        self.dampBallWallNorm[0] = 0.3
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallShear[0] = 0.08
+        self.dampBallWallShear[0] = 0.0
         self.lenContactBallBallRecord = 16
         self.lenContactBallWallRecord = 6
         # id of particles in contact
@@ -64,16 +64,13 @@ class Contact(object):
         self.tangOverlapBallWallOldX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
         self.tangOverlapBallWallOldY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
         self.tangOverlapBallWallOldZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
-
-        self.forceShearWallXPre = ti.field(dtype=flt_dtype, shape=(self.n, 6))
-        self.forceShearWallYPre = ti.field(dtype=flt_dtype, shape=(self.n, 6))
-        self.forceShearWallZPre = ti.field(dtype=flt_dtype, shape=(self.n, 6))
+        self.dt = ti.field(dtype=flt_dtype, shape=(1,))
 
     def init_contact(self, dt):
         self.contacts.fill(-1)
         self.contactsPre.fill(-1)
         self.contactCounter.fill(0)
-        self.dt = dt
+        self.dt[0] = dt
         # self.detect(gf, gd)
 
     @ti.kernel
@@ -405,13 +402,13 @@ class Contact(object):
         vs = v_rel - v_rel.dot(normal) * normal
 
         normal_contact_force = -kn * gap
-        normal_damping_force = -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+        normal_damping_force = ti.min(-2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn, 0)
         normal_force = (-normal_contact_force + normal_damping_force) * normal
         tangOverlapOld = vec(0.0, 0.0, 0.0)
         if index_pre != -1:
             tangOverlapOld = self.get_ball_ball_tang_overlap_old(i, index_pre)
         tangOverlapRot = tangOverlapOld - tangOverlapOld.dot(normal) * normal
-        tangOverTemp = vs * self.dt + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
+        tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
         trial_ft = - ks * tangOverTemp
         tang_damping_force = - 2.0 * sdratio * ti.math.sqrt(m_eff * ks) * vs
 
@@ -464,7 +461,7 @@ class Contact(object):
 
                     tangOverlapOld = self.get_ball_wall_tang_overlap_old(i, j)
                     tangOverlapRot = tangOverlapOld - tangOverlapOld.dot(normal) * normal
-                    tangOverTemp = vs * self.dt + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
+                    tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
                     trial_ft = -ks * tangOverTemp
                     tang_damping_force = -2.0 * sdratio * ti.math.sqrt(m_eff * ks) * vs
 
@@ -479,6 +476,8 @@ class Contact(object):
                     Ftotal = normal_force + tangential_force
                     resultant_moment = Ftotal.cross(pos1 - cpos)
                     particle.add_force_to_ball(i, Ftotal, resultant_moment)
+                    wall.add_contact_force(j, -Ftotal)
+                    wall.add_contact_stiffness(j, kn)
 
                 else:
                     pass

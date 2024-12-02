@@ -15,6 +15,8 @@ class Wall:
         self.stiffnessShear = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.dampNRatio = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.dampSRatio = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.contactForce = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.contactStiffness = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.initialize_box_pos(pos_x_min, pos_x_max, pos_y_min, pos_y_max, pos_z_min, pos_z_max)
         self.initialize_box_normal()
         self.initialize_box_friction()
@@ -95,6 +97,28 @@ class Wall:
             self.position[i, 0] += self.velocity[i, 0] * timestep
             self.position[i, 1] += self.velocity[i, 1] * timestep
             self.position[i, 2] += self.velocity[i, 2] * timestep
+
+    @ti.func
+    def add_contact_force(self, i: ti.int32, contactForce: vec):
+        self.contactForce[i, 0] += contactForce[0]
+        self.contactForce[i, 1] += contactForce[1]
+        self.contactForce[i, 2] += contactForce[2]
+
+    @ti.func
+    def add_contact_stiffness(self, i: ti.int32, contactStiffness: flt_dtype):
+        self.contactStiffness[i] += contactStiffness
+
+    @ti.kernel
+    def clear_contact_force(self):
+        for i in range(self.number):
+            self.contactForce[i, 0] = 0.0
+            self.contactForce[i, 1] = 0.0
+            self.contactForce[i, 2] = 0.0
+
+    @ti.kernel
+    def clear_contact_stiffness(self):
+        for i in range(self.number):
+            self.contactStiffness[i] = 0.0
 
     @ti.func
     def get_pos(self, i: ti.i32) -> vec:
