@@ -9,8 +9,9 @@ class Contact(object):
     # Allocate fields with fixed size for shear force information storage
     """
 
-    def __init__(self, n, fric=0.5, stiff_n=5.0e7, stiff_s=2.5e7, ):
+    def __init__(self, n, fric=0.5, stiff_n=5.0e7, stiff_s=2.5e7, model="linear"):
         self.n = n  # number of particles or rows for contact info storage
+        self.model = model
         self.frictionBallBall = ti.field(dtype=flt_dtype, shape=(1,))
         self.frictionBallBall[0] = fric
         self.frictionBallWall = ti.field(dtype=flt_dtype, shape=(1,))
@@ -26,11 +27,11 @@ class Contact(object):
         self.dampBallBallNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallBallNorm[0] = 0.7
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallShear[0] = 0.3
+        self.dampBallBallShear[0] = 0.2
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallWallNorm[0] = 0.3
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallShear[0] = 0.0
+        self.dampBallWallShear[0] = 0.2
         self.lenContactBallBallRecord = 16
         self.lenContactBallWallRecord = 6
         # id of particles in contact
@@ -39,28 +40,27 @@ class Contact(object):
         # id of particles in contact in the last cycle
         self.contactsPre = ti.field(dtype=ti.i32, shape=(self.n, self.lenContactBallBallRecord),
                                     name="contacts_pre")
+        self.contactsBallWall = ti.field(dtype=ti.i32, shape=(self.n, self.lenContactBallWallRecord))
+        self.contactsBallWallPre = ti.field(dtype=ti.i32, shape=(self.n, self.lenContactBallWallRecord))
         # contact number on one particle
         self.contactCounter = ti.field(dtype=ti.i32, shape=(self.n,))
-        self.contactDistX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.contactDistY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.contactDistZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        # shear force components
-        self.forceShearX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.forceShearY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.forceShearZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        # normal force components
-        self.force_n_x = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.force_n_y = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.force_n_z = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        # shear force component in the last cycle
-        self.forceShearXPre = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.forceShearYPre = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-        self.forceShearZPre = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-
+        # force components
+        self.forceX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
+        self.forceY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
+        self.forceZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
+        self.forceBallWallX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
+        self.forceBallWallY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
+        self.forceBallWallZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
+        # position
+        self.positionX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
+        self.positionY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
+        self.positionZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
+        self.positionBallWallX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
+        self.positionBallWallY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
+        self.positionBallWallZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
         self.tangOverlapBallBallOldX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
         self.tangOverlapBallBallOldY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
         self.tangOverlapBallBallOldZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallBallRecord))
-
         self.tangOverlapBallWallOldX = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
         self.tangOverlapBallWallOldY = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
         self.tangOverlapBallWallOldZ = ti.field(dtype=flt_dtype, shape=(self.n, self.lenContactBallWallRecord))
@@ -69,6 +69,8 @@ class Contact(object):
     def init_contact(self, dt):
         self.contacts.fill(-1)
         self.contactsPre.fill(-1)
+        self.contactsBallWall.fill(-1)
+        self.contactsBallWallPre.fill(-1)
         self.contactCounter.fill(0)
         self.dt[0] = dt
         # self.detect(gf, gd)
@@ -86,10 +88,9 @@ class Contact(object):
         self.contacts.fill(-1)  # Renew [num_particle, len_rec]
         # Zero the counting list [num_particle * 1, None]
         self.contactCounter.fill(0)  # Initialize
-        for i, j in self.forceShearX:
-            self.forceShearX[i, j] = 0.0
-            self.forceShearY[i, j] = 0.0
-            self.forceShearZ[i, j] = 0.0
+        for i, k in self.contactsBallWall:
+            self.contactsBallWallPre[i, k] = self.contactsBallWall[i, k]
+        self.contactsBallWall.fill(-1)
 
     @ti.kernel
     def detect(self, gf: ti.template(), gd: ti.template()):
@@ -223,8 +224,12 @@ class Contact(object):
                                     index_pre = self.get_index_pre(i, j)
                                     normal = self.get_normal(gf, i, j)
                                     cpos = self.get_ball_ball_cpos(gf, i, j)
-                                    self.resolve_ball_ball_force(
-                                        gf, i, j, index_i, index_j, index_pre, gap, normal, cpos)
+                                    if self.model == "linear":
+                                        self.resolve_ball_ball_force(
+                                            gf, i, j, index_i, index_j, index_pre, gap, normal, cpos)
+                                    elif self.model == "hertz":
+                                        self.resolve_ball_ball_force_hertz(
+                                            gf, i, j, index_i, index_j, index_pre, gap, normal, cpos)
                                 else:
                                     pass
                             else:
@@ -359,20 +364,33 @@ class Contact(object):
         return tang_overlap_old
 
     @ti.func
-    def get_effective_value(self, value_1: flt_dtype, value_2: flt_dtype) -> flt_dtype:
-        return value_1 * value_2 / (value_1 + value_2)
+    def calculate_effective_val(self, value_1: flt_dtype, value_2: flt_dtype) -> flt_dtype:
+        return 2 * value_1 * value_2 / (value_1 + value_2)
 
     @ti.func
-    def record_ball_ball_shear_info(self, i: ti.i32, index_i: ti.i32, tangOverlap: vec):
+    def record_ball_ball_shear_info(self, i: ti.i32, index_i: ti.i32, tangOverlap: vec, force: vec, pos: vec):
         self.tangOverlapBallBallOldX[i, index_i] = tangOverlap[0]
         self.tangOverlapBallBallOldY[i, index_i] = tangOverlap[1]
         self.tangOverlapBallBallOldZ[i, index_i] = tangOverlap[2]
+        self.forceX[i, index_i] = force[0]
+        self.forceY[i, index_i] = force[1]
+        self.forceZ[i, index_i] = force[2]
+        self.positionX[i, index_i] = pos[0]
+        self.positionY[i, index_i] = pos[1]
+        self.positionZ[i, index_i] = pos[2]
 
     @ti.func
-    def record_ball_wall_shear_info(self, i: ti.i32, index_i: ti.i32, tangOverlap: vec):
+    def record_ball_wall_shear_info(self, i: ti.i32, index_i: ti.i32, index_wall: ti.i32, tangOverlap: vec, force: vec, pos: vec):
+        self.contactsBallWall[i, index_i] = index_wall
         self.tangOverlapBallWallOldX[i, index_i] = tangOverlap[0]
         self.tangOverlapBallWallOldY[i, index_i] = tangOverlap[1]
         self.tangOverlapBallWallOldZ[i, index_i] = tangOverlap[2]
+        self.forceBallWallX[i, index_i] = force[0]
+        self.forceBallWallY[i, index_i] = force[1]
+        self.forceBallWallZ[i, index_i] = force[2]
+        self.positionBallWallX[i, index_i] = pos[0]
+        self.positionBallWallY[i, index_i] = pos[1]
+        self.positionBallWallZ[i, index_i] = pos[2]
 
     @ti.func
     def resolve_ball_ball_force(self, particle: ti.template(), i: ti.i32, j: ti.i32, index_i: ti.i32, index_j: ti.i32,
@@ -392,17 +410,17 @@ class Contact(object):
         vel1, vel2 = particle.get_vel(i), particle.get_vel(j)
         w1, w2 = particle.get_vel_rot(i), particle.get_vel_rot(j)
 
-        m_eff = self.get_effective_value(mass1, mass2)
+        m_eff = self.calculate_effective_val(mass1, mass2)
         kn, ks = self.stiffnessNorm[0], self.stiffnessShear[0]
         ndratio, sdratio = self.dampBallBallNorm[0], self.dampBallBallShear[0]
-        miu = self.frictionBallBall[0]
+        mu = self.frictionBallBall[0]
 
         v_rel = vel1 + w1.cross(cpos - pos1) - (vel2 + w2.cross(cpos - pos2))
         vn = v_rel.dot(normal)
-        vs = v_rel - v_rel.dot(normal) * normal
+        vs = v_rel - vn * normal
 
         normal_contact_force = -kn * gap
-        normal_damping_force = ti.min(-2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn, 0)
+        normal_damping_force = -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn
         normal_force = (-normal_contact_force + normal_damping_force) * normal
         tangOverlapOld = vec(0.0, 0.0, 0.0)
         if index_pre != -1:
@@ -412,7 +430,7 @@ class Contact(object):
         trial_ft = - ks * tangOverTemp
         tang_damping_force = - 2.0 * sdratio * ti.math.sqrt(m_eff * ks) * vs
 
-        fric = miu * ti.abs(normal_contact_force + normal_damping_force)
+        fric = mu * ti.abs(normal_contact_force - normal_damping_force)
         tangential_force = vec(0.0, 0.0, 0.0)
 
         if trial_ft.norm() > fric:
@@ -422,8 +440,66 @@ class Contact(object):
             tangential_force = trial_ft + tang_damping_force
         Ftotal = normal_force + tangential_force
         torque = tangential_force.cross(- normal)
-        self.record_ball_ball_shear_info(i, index_i, tangOverTemp)
-        self.record_ball_ball_shear_info(j, index_j, -tangOverTemp)
+        self.record_ball_ball_shear_info(i, index_i, tangOverTemp, Ftotal, cpos)
+        self.record_ball_ball_shear_info(j, index_j, -tangOverTemp, -Ftotal, cpos )
+        particle.add_force_to_ball(i, Ftotal, torque * (rad1 + gap*0.5))
+        particle.add_force_to_ball(j, -Ftotal, torque * (rad2 + gap*0.5))
+
+    @ti.func
+    def resolve_ball_ball_force_hertz(self, particle: ti.template(), i: ti.i32, j: ti.i32, index_i: ti.i32, index_j: ti.i32,
+        index_pre: ti.i32, gap: flt_dtype, normal: vec, cpos: vec):
+        """
+        Transform shear force to the new contact plane
+        :param particle: grain field
+        :return: None
+        """
+        #######################################################################################
+        #  Ball-ball force # Ball-ball force # Ball-ball force # Ball-ball force #Ball-ball   #
+        #######################################################################################
+        # in parallel
+        effective_E = 1.0e8
+        effective_G = 5.0e7
+        pos1, pos2 = particle.get_pos(i), particle.get_pos(j)
+        rad1, rad2 = particle.get_radius(i), particle.get_radius(j)
+        mass1, mass2 = particle.get_mass(i), particle.get_mass(j)
+        vel1, vel2 = particle.get_vel(i), particle.get_vel(j)
+        w1, w2 = particle.get_vel_rot(i), particle.get_vel_rot(j)
+
+        m_eff = self.calculate_effective_val(mass1, mass2)
+        rad_eff = self.calculate_effective_val(rad1, rad2)
+        contactAreaRad = ti.math.sqrt(-gap * rad_eff)
+        kn = 2.0 * effective_E * contactAreaRad
+        ks = 8.0 * effective_G * contactAreaRad
+
+        ndratio, sdratio = self.dampBallBallNorm[0], self.dampBallBallShear[0]
+        mu = self.frictionBallBall[0]
+
+        v_rel = vel1 + w1.cross(cpos - pos1) - (vel2 + w2.cross(cpos - pos2))
+        vn = v_rel.dot(normal)
+        vs = v_rel - vn * normal
+
+        normal_contact_force = -2.0/3.0 * kn * gap
+        normal_damping_force = -1.8257 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+        normal_force = (-normal_contact_force + normal_damping_force) * normal
+        tangOverlapOld = vec(0.0, 0.0, 0.0)
+        if index_pre != -1:
+            tangOverlapOld = self.get_ball_ball_tang_overlap_old(i, index_pre)
+        tangOverlapRot = tangOverlapOld - tangOverlapOld.dot(normal) * normal
+        tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
+        trial_ft = - ks * tangOverTemp
+        tang_damping_force = - 1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
+
+        fric = mu * ti.abs(normal_contact_force - normal_damping_force)
+        tangential_force = vec(0.0, 0.0, 0.0)
+        if trial_ft.norm() > fric:
+            tangential_force = fric * trial_ft.normalized()
+            tangOverTemp = - tangential_force / ks
+        else:
+            tangential_force = trial_ft + tang_damping_force
+        Ftotal = normal_force + tangential_force
+        torque = tangential_force.cross(- normal)
+        self.record_ball_ball_shear_info(i, index_i, tangOverTemp, Ftotal, cpos)
+        self.record_ball_ball_shear_info(j, index_j, -tangOverTemp, -Ftotal, cpos)
         particle.add_force_to_ball(i, Ftotal, torque * (rad1 + gap*0.5))
         particle.add_force_to_ball(j, -Ftotal, torque * (rad2 + gap*0.5))
 
@@ -447,7 +523,7 @@ class Contact(object):
 
                     kn, ks = self.stiffnessNormWall[0], self.stiffnessShearWall[0]
                     ndratio, sdratio = self.dampBallWallNorm[0], self.dampBallWallShear[0]
-                    miu = self.frictionBallWall[0]
+                    mu = self.frictionBallWall[0]
 
                     cpos = self.get_ball_wall_cpos(particle, wall, i, j)
                     v_rel = vel1 + w1.cross(cpos - pos1) - vel2
@@ -456,7 +532,7 @@ class Contact(object):
 
                     normal_contact_force = -kn * gap
                     # collision damping
-                    normal_damping_force = ti.max(0, -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn)
+                    normal_damping_force = -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn
                     normal_force = (normal_contact_force + normal_damping_force) * normal
 
                     tangOverlapOld = self.get_ball_wall_tang_overlap_old(i, j)
@@ -465,7 +541,7 @@ class Contact(object):
                     trial_ft = -ks * tangOverTemp
                     tang_damping_force = -2.0 * sdratio * ti.math.sqrt(m_eff * ks) * vs
 
-                    fric = miu * ti.abs(normal_contact_force + normal_damping_force)
+                    fric = mu * ti.abs(normal_contact_force + normal_damping_force)
                     tangential_force = vec(0.0, 0.0, 0.0)
                     if trial_ft.norm() > fric:
                         tangential_force = fric * trial_ft.normalized()
@@ -484,3 +560,63 @@ class Contact(object):
 
                 self.record_ball_wall_shear_info(i, j, tangOverTemp)
 
+    @ti.kernel
+    def resolve_ball_wall_force_hertz(self, particle: ti.template(), wall: ti.template()):
+        #######################################################################################
+        #  Ball-wall force # Ball-wall force # Ball-wall force # Ball-wall force #Ball-wall   #
+        #######################################################################################
+        for i in range(particle.number):
+            # Gap from the boundary in negative x direction:
+            for j in range(wall.number):
+                gap = self.get_ball_wall_gap(particle, wall, i, j)
+                tangOverTemp = vec(0.0, 0.0, 0.0)
+                if gap < 0.0:
+                    effective_E = 1.0e8
+                    effective_G = 5.0e7
+                    pos1, pos2 = particle.get_pos(i), wall.get_pos(j)
+                    rad1 = particle.get_radius(i)
+                    vel1, vel2 = particle.get_vel(i), wall.get_vel(j)
+                    w1 = particle.get_vel_rot(i)
+                    normal = wall.get_normal(j)
+                    m_eff = particle.get_mass(i)
+                    rad_eff = rad1
+                    contactAreaRad = ti.math.sqrt(-gap * rad_eff)
+                    ndratio, sdratio = self.dampBallWallNorm[0], self.dampBallWallShear[0]
+                    mu = self.frictionBallWall[0]
+
+                    kn = 2 * effective_E * contactAreaRad
+                    ks = 8 * effective_G * contactAreaRad
+                    cpos = self.get_ball_wall_cpos(particle, wall, i, j)
+                    v_rel = vel1 + w1.cross(cpos - pos1) - vel2
+                    vn = v_rel.dot(normal)
+                    vs = v_rel - v_rel.dot(normal) * normal
+
+                    normal_contact_force = -2./3. * kn * gap
+                    # collision damping
+                    normal_damping_force = -1.8257 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+                    normal_force = (normal_contact_force + normal_damping_force) * normal
+
+                    tangOverlapOld = self.get_ball_wall_tang_overlap_old(i, j)
+                    tangOverlapRot = tangOverlapOld - tangOverlapOld.dot(normal) * normal
+                    tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
+                    trial_ft = -ks * tangOverTemp
+                    tang_damping_force = -1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
+
+                    fric = mu * ti.abs(normal_contact_force + normal_damping_force)
+                    tangential_force = vec(0.0, 0.0, 0.0)
+                    if trial_ft.norm() > fric:
+                        tangential_force = fric * trial_ft.normalized()
+                        tangOverTemp = - tangential_force / ks
+                    else:
+                        tangential_force = trial_ft + tang_damping_force
+
+                    Ftotal = normal_force + tangential_force
+                    resultant_moment = Ftotal.cross(pos1 - cpos)
+                    particle.add_force_to_ball(i, Ftotal, resultant_moment)
+                    wall.add_contact_force(j, -Ftotal)
+                    wall.add_contact_stiffness(j, kn)
+                    self.record_ball_wall_shear_info(i, j, j, tangOverTemp, Ftotal, cpos)
+                else:
+                    self.record_ball_wall_shear_info(i, j, -1, vec(0, 0, 0), vec(0, 0, 0), vec(0, 0, 0))
+
+                

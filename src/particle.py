@@ -1,6 +1,8 @@
 import taichi as ti
 from fmt import flt_dtype
 vec = ti.math.vec3
+vec4 = ti.math.vec4
+mat3x3 = ti.types.matrix(3, 3, flt_dtype)
 
 
 @ti.data_oriented
@@ -24,24 +26,26 @@ class Particle:
                              name="mass")
         self.rad = ti.field(dtype=flt_dtype, shape=(number,),
                             name="radius")
-        self.inertia = ti.field(dtype=flt_dtype, shape=(number,),
+        self.inertia = ti.field(dtype=flt_dtype, shape=(number, 3),
                                 name="inertial moment")
-        self.inv_i = ti.field(dtype=flt_dtype, shape=(number,),name="inverse")
+        self.inv_i = ti.field(dtype=flt_dtype, shape=(number, 3),name="inverse")
         self.vel = ti.field(dtype=flt_dtype, shape=(number, 3),
                             name="velocity")
         self.velRot = ti.field(dtype=flt_dtype, shape=(number, 3),
                                name="rotational velocity")
         self.acc = ti.field(dtype=flt_dtype, shape=(number, 3))
+        self.accRot = ti.field(dtype=flt_dtype, shape=(number, 3))
         self.angmoment = ti.field(dtype=flt_dtype, shape=(number, 3), name="angular moment")
 
         self.forceContact = ti.field(dtype=flt_dtype, shape=(number, 3),
                                      name="contact force")
         self.torque = ti.field(dtype=flt_dtype, shape=(number, 3),
                                name="moment")
+        self.q = ti.field(dtype=flt_dtype, shape=(number, 4), name="quaternion")
         self.damp_f = ti.field(dtype=flt_dtype, shape=(1, ),)
-        self.damp_f[0] = 0.0
+        self.damp_f[0] = 0.002
         self.damp_t = ti.field(dtype=flt_dtype, shape=(1, ),)
-        self.damp_t[0] = 0.0
+        self.damp_t[0] = 0.002
         self.volumeSolid = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
     @ti.kernel
@@ -78,8 +82,12 @@ class Particle:
 
             self.rad[i] = ti.random() * (self.radMax[0] - self.radMin[0]) + self.radMin[0]
             self.mass[i] = self.density[0] * ti.math.pi * self.rad[i] ** 3 * 4 / 3
-            self.inertia[i] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0  # Moment of inertia
-            self.inv_i[i] = 1.0 / self.inertia[i]
+            self.inertia[i, 0] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0  # Moment of inertia
+            self.inertia[i, 1] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0
+            self.inertia[i, 2] = self.mass[i] * self.rad[i] ** 2 * 2.0 / 5.0
+            self.inv_i[i, 0] = 1.0 / self.inertia[i, 0]
+            self.inv_i[i, 1] = 1.0 / self.inertia[i, 1]
+            self.inv_i[i, 2] = 1.0 / self.inertia[i, 2]
         for i in range(self.number):
             self.volumeSolid[0] += self.rad[i] ** 3 * 4 / 3 * ti.math.pi
 
@@ -89,6 +97,36 @@ class Particle:
         resultant_force[1] *= 1.0 - damp * ti.math.sign(resultant_force[1]*vel[1])
         resultant_force[2] *= 1.0 - damp * ti.math.sign(resultant_force[2]*vel[2])
         return resultant_force
+
+    @ti.func
+    def SetDQ(self, q, omega):
+        qw, qx, qy, qz = q[3], q[0], q[1], q[2]
+        ox, oy, oz = omega[0], omega[1], omega[2]
+        return 0.5 * vec4([
+            ox * qw - oy * qz + oz * qy,
+            oy * qw - oz * qx + ox * qz,
+            oz * qw - ox * qy + oy * qx,
+            -ox * qx - oy * qy - oz * qz])
+
+    @ti.func
+    def SetToRotate(self, q):
+        qw, qx, qy, qz = q[3], q[0], q[1], q[2]
+        return mat3x3([[1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)], 
+                       [2 * (qx * qy + qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qx * qw)], 
+                       [2 * (qx * qz - qy * qw), 2 * (qy * qz + qx * qw), 1 - 2 * (qx * qx + qy * qy)]])
+
+    @ti.func
+    def w_dot(self, w, torque, inertia, inv_inertia):
+        return vec((torque[0] + w[1] * w[2] * (inertia[1] - inertia[2])) * inv_inertia[0],
+            (torque[1] + w[2] * w[0] * (inertia[2] - inertia[0])) * inv_inertia[1],
+            (torque[2] + w[0] * w[1] * (inertia[0] - inertia[1])) * inv_inertia[2])
+
+    @ti.func
+    def normalize_quaternion(self, quaternion: vec4) -> vec4:
+        res = vec4(0.0, 0.0, 0.0, 0.0)
+        if quaternion.norm() > 0.0:
+            res = quaternion / quaternion.norm()
+        return res
 
     @ti.kernel
     def update_pos_euler(self, dt: flt_dtype, gravity: vec):
@@ -132,38 +170,45 @@ class Particle:
         :return:
         """
         for i in range(self.number):
+            
             fdamp = self.damp_f[0]
             tdamp = self.damp_t[0]
+            
             cforce, ctorque = self.get_force_contact(i), self.get_torque_contact(i)
 
             mass = self.get_mass(i)
-            old_av, old_vel, old_disp = self.get_acc(i), self.get_vel(i), self.get_verlet_disp(i)
+            old_av, old_vel, old_pos = self.get_acc(i), self.get_vel(i), self.get_pos(i)
 
             vel_half = old_vel + 0.5 * dt * old_av
             force = self.cundall_damp1st(fdamp, cforce + gravity * mass , vel_half)
-            delta_x = dt * vel_half 
+            pos = old_pos + dt * vel_half 
             av = force / mass
             vel = vel_half + 0.5 * av * dt
             
             self.set_acc(i, av)
             self.set_vel(i, vel)
-            x = self.get_pos(i) + delta_x
-            self.set_pos(i, x)
-            self.set_verlet_disp(i, old_disp + delta_x)
-
+            self.set_pos(i, pos)
+            
             inv_i = self.get_inv_i(i)
-            old_angmoment, old_omega = self.get_angmoment(i), self.get_vel_rot(i)
+            inertia = 1. / inv_i
+            old_omega, old_q = self.get_vel_rot(i), self.get_q(i)
 
-            torque = self.cundall_damp1st(tdamp, ctorque, old_omega + 0.5 * ctorque * inv_i)
-            angmoment = old_angmoment + 0.5 * torque * dt
-            omega = angmoment * inv_i
-            # dq = dt[None] * SetDQ(old_q, omega)
-            # half_q = old_q + 0.5 * dq
-            angmoment_half = old_angmoment + torque * dt
-            omega_half = angmoment_half * inv_i
+            torque = self.cundall_damp1st(tdamp, ctorque, old_omega)
+            rotation_matrix = self.SetToRotate(old_q)
 
-            self.set_vel_rot(i, omega_half)
-            self.set_angmoment(i, angmoment_half)
+            torque_local = rotation_matrix.transpose() @ torque
+            omega_local = rotation_matrix.transpose() @ old_omega
+            K1 = dt * self.w_dot(omega_local, torque_local, inertia, inv_i)
+            K2 = dt * self.w_dot(omega_local + K1, torque_local, inertia, inv_i)
+            K3 = dt * self.w_dot(omega_local + 0.25 * (K1 + K2), torque_local, inertia, inv_i)
+            omega_local += (K1 + K2 + 4. * K3) / 6.
+            omega = rotation_matrix @ omega_local
+
+            dq = dt * self.SetDQ(old_q, omega_local)
+            q = self.normalize_quaternion(old_q + dq)
+
+            self.set_vel_rot(i, omega)
+            self.set_q(i, q)
 
     @ti.kernel
     def clear_force(self):
@@ -222,7 +267,7 @@ class Particle:
 
     @ti.func
     def get_inv_i(self, i: ti.i32) -> flt_dtype:
-        return self.inv_i[i]
+        return vec(self.inv_i[i, 0] , self.inv_i[i, 1], self.inv_i[i, 2])
 
     @ti.func
     def get_pos(self, i: ti.i32) -> vec:
@@ -279,10 +324,31 @@ class Particle:
         return vec(self.acc[i, 0], self.acc[i, 1], self.acc[i, 2])
 
     @ti.func
+    def get_acc_rot(self, i: ti.i32) -> vec:
+        return vec(self.accRot[i, 0], self.accRot[i, 1], self.accRot[i, 2])
+
+    @ti.func
     def set_acc(self, i: ti.i32, acc: vec):
         self.acc[i, 0] = acc[0]
         self.acc[i, 1] = acc[1]
         self.acc[i, 2] = acc[2]
+
+    @ti.func
+    def set_acc_rot(self, i: ti.i32, accRot: vec):
+        self.accRot[i, 0] = accRot[0]
+        self.accRot[i, 1] = accRot[1]
+        self.accRot[i, 2] = accRot[2]
+
+    @ti.func
+    def set_q(self, i: ti.i32, q: vec4):
+        self.q[i, 0] = q[0]
+        self.q[i, 1] = q[1]
+        self.q[i, 2] = q[2]
+        self.q[i, 3] = q[3]
+
+    @ti.func
+    def get_q(self, i: ti.i32) -> vec4:
+        return vec4(self.q[i, 0], self.q[i, 1], self.q[i, 2], self.q[i, 3])
 
     @ti.func
     def get_force_contact(self, i: ti.i32) -> vec:

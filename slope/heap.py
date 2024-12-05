@@ -15,7 +15,7 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class Slope(object):
-    def __init__(self, number_particle, vt_is_on, log_is_on=True):
+    def __init__(self, number_particle, vt_is_on, log_is_on=False):
         self.substep = 10000
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
@@ -47,12 +47,12 @@ class Slope(object):
         self.cyc_num = ti.field(dtype=ti.i32, shape=1)
         self.rec_num = ti.field(dtype=ti.i32, shape=1)
         self.gravity = ti.field(dtype=flt_dtype, shape=(3,))
-        self.gravity[1] = -9.81 * 4.0
+        self.gravity[1] = -9.81 * 10.0
 
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.6
+        coefficient = 0.2
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -112,16 +112,18 @@ class Slope(object):
     def update(self,):
         self.particle.clear_force()
         self.contact.clear_contact()
-
+        self.wall.clear_contact_force()
+        self.wall.clear_contact_stiffness()
         # contact detection
         self.contact.detect(self.particle, self.grid)
         self.contact.resolve_ball_wall_force(self.particle, self.wall)
         
         # particle update
         gravity = self.get_gravity()
-        self.particle.update_pos_euler(self.dt[0], gravity)
+        self.particle.update_pos_verlet(self.dt[0], gravity)
         # wall
-        self.wall.update_position(timestep=self.contact.dt)
+        self.compute_servo()
+        self.wall.update_position(timestep=self.dt[0])
         # advance time
         self.update_time()
 
@@ -150,7 +152,7 @@ class Slope(object):
             self.print_info()
             if self.log_is_on:
                 self.write_ball_info(self.rec_num[0])
-            if self.cyc_num[0] >= 2000000:
+            if self.cyc_num[0] >= 100000:
                 break
 
     def move_wall(self):
@@ -166,7 +168,7 @@ class Slope(object):
             self.print_info()
             if self.log_is_on:
                 self.write_ball_info(self.rec_num[0])
-            if self.cyc_num[0] >= 10000000:
+            if self.cyc_num[0] >= 1000000:
                 break
 
     def print_info(self):

@@ -11,7 +11,7 @@ ti.init(arch=ti.gpu, device_memory_fraction=0.5,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
-number_particle = 1024 * 512
+number_particle = 1024 * 2
 
 ic = Slope(number_particle, vt_is_on=False) 
 ic.init()
