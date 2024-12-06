@@ -19,7 +19,7 @@ class Slope(object):
         self.substep = 10000
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number)  # contact info
+        self.contact = Contact(self.particle.number, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -116,13 +116,12 @@ class Slope(object):
         self.wall.clear_contact_stiffness()
         # contact detection
         self.contact.detect(self.particle, self.grid)
-        self.contact.resolve_ball_wall_force(self.particle, self.wall)
+        self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall, 1)
         
         # particle update
         gravity = self.get_gravity()
         self.particle.update_pos_verlet(self.dt[0], gravity)
         # wall
-        self.compute_servo()
         self.wall.update_position(timestep=self.dt[0])
         # advance time
         self.update_time()
@@ -152,7 +151,7 @@ class Slope(object):
             self.print_info()
             if self.log_is_on:
                 self.write_ball_info(self.rec_num[0])
-            if self.cyc_num[0] >= 100000:
+            if self.cyc_num[0] >= 2000000:
                 break
 
     def move_wall(self):
@@ -168,7 +167,7 @@ class Slope(object):
             self.print_info()
             if self.log_is_on:
                 self.write_ball_info(self.rec_num[0])
-            if self.cyc_num[0] >= 1000000:
+            if self.cyc_num[0] >= 10000000:
                 break
 
     def print_info(self):
