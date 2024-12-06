@@ -15,7 +15,7 @@ class Contact(object):
         self.frictionBallBall = ti.field(dtype=flt_dtype, shape=(1,))
         self.frictionBallBall[0] = fric
         self.frictionBallWall = ti.field(dtype=flt_dtype, shape=(1,))
-        self.frictionBallWall[0] = 0.0
+        self.frictionBallWall[0] = 0.5
         self.stiffnessNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiffnessNorm[0] = stiff_n
         self.stiffnessNormWall = ti.field(dtype=flt_dtype, shape=(1,))
@@ -32,7 +32,7 @@ class Contact(object):
         self.dampBallWallNorm[0] = 0.3
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallWallShear[0] = 0.2
-        self.lenContactBallBallRecord = 16
+        self.lenContactBallBallRecord = 32
         self.lenContactBallWallRecord = 6
         # id of particles in contact
         self.contacts = ti.field(dtype=ti.i32, shape=(self.n, self.lenContactBallBallRecord),
@@ -457,8 +457,8 @@ class Contact(object):
         #  Ball-ball force # Ball-ball force # Ball-ball force # Ball-ball force #Ball-ball   #
         #######################################################################################
         # in parallel
-        effective_E = 1.0e8
-        effective_G = 5.0e7
+        effective_E = 5.0e8
+        effective_G = 2.5e8
         pos1, pos2 = particle.get_pos(i), particle.get_pos(j)
         rad1, rad2 = particle.get_radius(i), particle.get_radius(j)
         mass1, mass2 = particle.get_mass(i), particle.get_mass(j)
@@ -561,7 +561,7 @@ class Contact(object):
                 self.record_ball_wall_shear_info(i, j, tangOverTemp)
 
     @ti.kernel
-    def resolve_ball_wall_force_hertz(self, particle: ti.template(), wall: ti.template()):
+    def resolve_ball_wall_force_hertz(self, particle: ti.template(), wall: ti.template(), dp_mode:ti.i32):
         #######################################################################################
         #  Ball-wall force # Ball-wall force # Ball-wall force # Ball-wall force #Ball-wall   #
         #######################################################################################
@@ -571,8 +571,8 @@ class Contact(object):
                 gap = self.get_ball_wall_gap(particle, wall, i, j)
                 tangOverTemp = vec(0.0, 0.0, 0.0)
                 if gap < 0.0:
-                    effective_E = 1.0e8
-                    effective_G = 5.0e7
+                    effective_E = 5.0e8
+                    effective_G = 2.5e8
                     pos1, pos2 = particle.get_pos(i), wall.get_pos(j)
                     rad1 = particle.get_radius(i)
                     vel1, vel2 = particle.get_vel(i), wall.get_vel(j)
@@ -600,7 +600,10 @@ class Contact(object):
                     tangOverlapRot = tangOverlapOld - tangOverlapOld.dot(normal) * normal
                     tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
                     trial_ft = -ks * tangOverTemp
+
                     tang_damping_force = -1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
+                    if dp_mode == 1:
+                        tangential_force = ti.max(tang_damping_force, 0)
 
                     fric = mu * ti.abs(normal_contact_force + normal_damping_force)
                     tangential_force = vec(0.0, 0.0, 0.0)

@@ -160,6 +160,37 @@ class Compress(object):
                               self.contact.positionZ[i, index_i])
                     writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
 
+    def write_contact_info_drained_shear(self, index):
+        with open('output/drained_shear_info/compress_contact_{}.csv'.format(index), 'w') as file:
+            writer = csv.writer(file)
+            writer.writerow(['pos_x', 'pos_y', 'pos_z', 'force_x', 'force_y', 'force_z'])
+            for i in range(self.particle.number):
+                for index_i in range(self.contact.lenContactBallBallRecord):
+                    j = self.contact.contacts[i, index_i]
+                    if j == -1:
+                        break
+                    if i > j:
+                        continue
+                    force = vec(self.contact.forceX[i, index_i],
+                                self.contact.forceY[i, index_i],
+                                self.contact.forceZ[i, index_i])
+                    pos = vec(self.contact.positionX[i, index_i],
+                              self.contact.positionY[i, index_i],
+                              self.contact.positionZ[i, index_i])
+                    writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
+            for i in range(self.particle.number):
+                for index_i in range(self.contact.lenContactBallWallRecord):
+                    j = self.contact.contactsBallWall[i, index_i]
+                    if j == -1:
+                        continue
+                    force = vec(self.contact.forceBallWallX[i, index_i],
+                                self.contact.forceBallWallY[i, index_i],
+                                self.contact.forceBallWallZ[i, index_i])
+                    pos = vec(self.contact.positionX[i, index_i],
+                              self.contact.positionY[i, index_i],
+                              self.contact.positionZ[i, index_i])
+                    writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
+
     def set_wall_servo_vel(self):
         vel_tgt = vec(self.servoVelocity[0], self.servoVelocity[1], self.servoVelocity[2])
         self.wall.set_velocity(0, vec(vel_tgt[0], 0.0, 0.0))
@@ -254,7 +285,7 @@ class Compress(object):
                     self.update()
                 self.print_info()
                 e1 = self.voidRatio[0]
-                isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-5
+                isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 2.0e-6
                 if isStable:
                     self.write_ball_info(record_count)
                     self.write_contact_info(record_count)
@@ -271,7 +302,7 @@ class Compress(object):
                 self.update()
             self.print_info()
             e1 = self.voidRatio[0]
-            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-5
+            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 2.0e-6
             if isStable:
                 self.write_ball_info(record_count)
                 self.write_contact_info(record_count)
@@ -411,5 +442,5 @@ class Compress(object):
         """pour the particles for demo"""
         self.generate()
         self.aggregate_particles()
-        self.drained_shear()
+        # self.drained_shear()
 
