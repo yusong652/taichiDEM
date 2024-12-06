@@ -1,5 +1,5 @@
 import taichi as ti
-from compress import Compress
+from undrained_shear import UndrainedShear
 import sys
 sys.path.append("../src")
 from fmt import flt_dtype
@@ -13,7 +13,7 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.5,
 
 number_particle = 1024 * 4
 
-ic = Compress(number_particle, vt_is_on=False) 
-ic.init()
+us = UndrainedShear(number_particle, vt_is_on=False) 
+us.init()
 if __name__ == "__main__":
-    ic.run()
+    us.run()

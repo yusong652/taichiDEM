@@ -15,10 +15,10 @@ strain_y = (-length_y + length_y[0]) / length_y[0] * 100.0
 
 fig = plt.figure()
 ax = plt.gca()
-ax.plot(strain_y[::500], stress_q[::500])
+ax.plot(strain_y[::5], stress_q[::5])
 
 ax.set_xscale('linear')
 ax.set_xlim(0.0, 20.0)
-ax.set_ylim(-10.0, 100.0)
+# ax.set_ylim(-10.0, 100.0)
 
 plt.show()

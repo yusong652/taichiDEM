@@ -28,7 +28,7 @@ class Slope(object):
             pass
         self.duration = ti.field(dtype=flt_dtype, shape=(1,))
         self.duration[0] = 0.0
-        self.dt = ti.field(dtype=ti.f32, shape=(1,))
+        self.dt = ti.field(dtype=flt_dtype, shape=(1,))
         self.wallPosMin = ti.field(dtype=flt_dtype, shape=3)
         self.wallPosMax = ti.field(dtype=flt_dtype, shape=3)
         self.wallPosMin[0] = -self.grid.domain_size * 0.48

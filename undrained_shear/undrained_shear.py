@@ -15,12 +15,12 @@ vec = ti.math.vec3
 
 
 @ti.data_oriented
-class Compress(object):
+class UndrainedShear(object):
     def __init__(self, number_particle, vt_is_on, log_is_on=False):
         self.substep = 100
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.30, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.35, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -60,7 +60,7 @@ class Compress(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.1
+        coefficient = 0.5
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -74,8 +74,8 @@ class Compress(object):
             writer = csv.writer(file)
             writer.writerow(['stress_x', 'stress_y', 'stress_z', 'void_ratio'])
 
-    def write_drained_shear_info_title(self):
-        with open('output/drained_shear_info/drained_shear_info.csv', 'w') as file:
+    def write_undrained_shear_info_title(self):
+        with open('output/undrained_shear_info/drained_shear_info.csv', 'w') as file:
             writer = csv.writer(file)
             writer.writerow(['stress_x', 'stress_y', 'stress_z',
              'length_x', 'length_y', 'length_z', 'void_ratio'])
@@ -85,8 +85,8 @@ class Compress(object):
             writer = csv.writer(file)
             writer.writerow([self.stress[0], self.stress[1], self.stress[2], self.voidRatio[0]])
 
-    def write_drained_shear_info(self):
-        with open('output/drained_shear_info/drained_shear_info.csv', 'a', newline='') as file:
+    def write_undrained_shear_info(self):
+        with open('output/undrained_shear_info/drained_shear_info.csv', 'a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([self.stress[0], self.stress[1], self.stress[2],
             self.length[0], self.length[1], self.length[2], self.voidRatio[0]])      
@@ -108,7 +108,7 @@ class Compress(object):
                            'forceContact_y': self.particle.forceContact.to_numpy()[:, 1],
                            'forceContact_z': self.particle.forceContact.to_numpy()[:, 2],
                            'rad': self.particle.rad.to_numpy()})
-        df.to_csv(path + '{}.csv'.format(save_n), index=False)
+        df.to_csv('output/comp_info/ball_info_{}.csv'.format(save_n), index=False)
 
     def write_contact_info(self, index, path='output/comp_info/compress_contact_'):
         with open(path + '{}.csv'.format(index), 'w') as file:
@@ -155,10 +155,6 @@ class Compress(object):
         self.servoStress[1] = stress[1]
         self.servoStress[2] = stress[2]
 
-    def set_servo_stress_confine(self, stress_mid, stress_minor):
-        self.servoStress[0] = stress_mid
-        self.servoStress[2] = stress_minor
-
     def get_gravity(self):
         return vec(self.gravity[0], self.gravity[1], self.gravity[2])
 
@@ -180,7 +176,7 @@ class Compress(object):
         
         # particle update
         gravity = self.get_gravity()
-        self.particle.update_pos_euler(self.dt[0], gravity)
+        self.particle.update_pos_verlet(self.dt[0], gravity)
         # wall
         self.wall.update_position(timestep=self.dt[0])
         # advance time
@@ -214,7 +210,7 @@ class Compress(object):
         self.stressDifRatio[1] = abs(self.stress[1] - self.servoStress[1])/self.servoStress[1]
         self.stressDifRatio[2] = abs(self.stress[2] - self.servoStress[2])/self.servoStress[2]
 
-    def is_stress_stable(self, tolerance=1.0e-2):
+    def is_stress_stable(self, tolerance=5.0e-3):
         return self.stressDifRatio[0] < tolerance and self.stressDifRatio[1] < tolerance and self.stressDifRatio[2] < tolerance
 
     def aggregate_particles(self):
@@ -260,12 +256,11 @@ class Compress(object):
                 self.write_compress_info()
                 break
 
-    def drained_shear(self):
-        self.write_drained_shear_info_title()
-        self.set_servo_stress_confine(self.stress[0], self.stress[2])
+    def undrained_shear(self):
+        self.write_undrained_shear_info_title()
         self.axialLengthIni[0] = self.length[1]
         record_count = 0
-        strain_tgts = np.linspace(0.0, 0.3, 31)
+        strain_tgts = np.linspace(0.0, 0.3, 301)
         strain_tgt = strain_tgts[record_count]
         strain = abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0]
         while abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0] < 0.3:
@@ -278,8 +273,8 @@ class Compress(object):
             self.write_drained_shear_info()
             strain = abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0]
             if strain > strain_tgt:
-                self.write_ball_info(record_count, path='output/drained_shear_info/drained_shear_ball_')
-                self.write_contact_info(record_count, path='output/drained_shear_info/drained_shear_contact_')
+                self.write_ball_info(record_count, path='output/undrained_shear_info/undrained_shear_contact_')
+                self.write_contact_info(record_count, path='output/undrained_shear_info/drained_shear_contact_')
                 record_count += 1
                 strain_tgt = strain_tgts[record_count]
 
@@ -318,7 +313,7 @@ class Compress(object):
         self.voidRatio[0] = (self.volume[0] - self.particle.volumeSolid[0]) / self.particle.volumeSolid[0]
 
     def compute_servo_velocity(self):
-        servoFactor = 0.005
+        servoFactor = 0.01
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurY = self.stress[1] * self.length[0] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
@@ -343,24 +338,16 @@ class Compress(object):
         self.servoVelocity[1] = servoVelocity[1]
         self.servoVelocity[2] = servoVelocity[2]
 
-    def compute_servo_velocity_drained_shear(self, axial_vel=0.01):
-        servoFactor = 0.01
-        forceCurX = self.stress[0] * self.length[1] * self.length[2]
-        forceCurZ = self.stress[2] * self.length[0] * self.length[1]
-        forceTargetX = self.servoStress[0] * self.length[1] * self.length[2]
-        forceTargetZ = self.servoStress[2] * self.length[0] * self.length[1]
-        forceDifX = forceTargetX - forceCurX
-        forceDifZ = forceTargetZ - forceCurZ
-        stiffnessMin = 1.0e7
-        stiffnessX = ti.max((self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5, stiffnessMin)
-        stiffnessZ = ti.max((self.wall.contactStiffness[4] + self.wall.contactStiffness[5]) * 0.5, stiffnessMin)
-        velocityMax = 0.5
-        velocityMin = -0.5
-        servoVelocity = ti.min(vec(
-            forceDifX / stiffnessX / self.dt[0] * servoFactor,
-            axial_vel,
-            forceDifZ / stiffnessZ / self.dt[0] * servoFactor), velocityMax)
-        servoVelocity = ti.max(servoVelocity, velocityMin)
+    def compute_servo_velocity_undrained_shear(self, axial_vel=0.01):
+        area = vec(self.length[1] * self.length[2],
+                   self.length[0] * self.length[2],
+                   self.length[0] * self.length[1])
+        volume_increment = axial_vel * area[1]
+        volume_frac_x = self.length[2] / (self.length[0] + self.length[2])
+        volume_frac_z = 1. - volume_frac_x
+        servoVelocity = vec(- volume_increment * volume_frac_x / area[0],
+                            axial_vel,
+                            - volume_increment * volume_frac_z / area[2])
         self.servoVelocity[0] = servoVelocity[0]
         self.servoVelocity[1] = servoVelocity[1]
         self.servoVelocity[2] = servoVelocity[2]
@@ -379,7 +366,7 @@ class Compress(object):
         self.compute_volume()
         self.compute_void_ratio()
         self.compute_stress()
-        self.compute_servo_velocity_drained_shear()
+        self.compute_servo_velocity_undrained_shear()
         self.set_wall_servo_vel()
 
     def print_info(self):
@@ -401,5 +388,5 @@ class Compress(object):
         """pour the particles for demo"""
         self.generate()
         self.aggregate_particles()
-        self.drained_shear()
+        self.undrained_shear()
 

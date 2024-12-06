@@ -7,7 +7,7 @@ mat3x3 = ti.types.matrix(3, 3, flt_dtype)
 
 @ti.data_oriented
 class Particle:
-    def __init__(self, number, radius_max=0.02, radius_min=0.02):
+    def __init__(self, number, radius_max=0.015, radius_min=0.01):
         self.number = number
         if radius_min > radius_max:
             raise ValueError('Radius_min can not be larger than radius_max!')
@@ -43,9 +43,9 @@ class Particle:
                                name="moment")
         self.q = ti.field(dtype=flt_dtype, shape=(number, 4), name="quaternion")
         self.damp_f = ti.field(dtype=flt_dtype, shape=(1, ),)
-        self.damp_f[0] = 0.002
+        self.damp_f[0] = 0.0
         self.damp_t = ti.field(dtype=flt_dtype, shape=(1, ),)
-        self.damp_t[0] = 0.002
+        self.damp_t[0] = 0.0
         self.volumeSolid = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
     @ti.kernel

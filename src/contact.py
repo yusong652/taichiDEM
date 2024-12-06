@@ -27,9 +27,9 @@ class Contact(object):
         self.dampBallBallNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallBallNorm[0] = 0.7
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallShear[0] = 0.2
+        self.dampBallBallShear[0] = 0.1
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallNorm[0] = 0.3
+        self.dampBallWallNorm[0] = 0.2
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallWallShear[0] = 0.2
         self.lenContactBallBallRecord = 16
@@ -257,7 +257,7 @@ class Contact(object):
         pos_rel = pos1 - pos2
         normal = wall.get_normal(j)
         dist = pos_rel.dot(normal)
-        gap = dist - gf.rad[i]
+        gap = dist - gf.get_radius(i)
         return gap
 
     @ti.func
@@ -457,8 +457,8 @@ class Contact(object):
         #  Ball-ball force # Ball-ball force # Ball-ball force # Ball-ball force #Ball-ball   #
         #######################################################################################
         # in parallel
-        effective_E = 1.0e8
-        effective_G = 5.0e7
+        effective_E = 5.0e8
+        effective_G = 2.5e8
         pos1, pos2 = particle.get_pos(i), particle.get_pos(j)
         rad1, rad2 = particle.get_radius(i), particle.get_radius(j)
         mass1, mass2 = particle.get_mass(i), particle.get_mass(j)
@@ -571,8 +571,8 @@ class Contact(object):
                 gap = self.get_ball_wall_gap(particle, wall, i, j)
                 tangOverTemp = vec(0.0, 0.0, 0.0)
                 if gap < 0.0:
-                    effective_E = 1.0e8
-                    effective_G = 5.0e7
+                    effective_E = 5.0e8
+                    effective_G = 2.5e8
                     pos1, pos2 = particle.get_pos(i), wall.get_pos(j)
                     rad1 = particle.get_radius(i)
                     vel1, vel2 = particle.get_vel(i), wall.get_vel(j)
