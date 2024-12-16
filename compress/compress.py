@@ -20,7 +20,7 @@ class Compress(object):
         self.substep = 100
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.30, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.2, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -60,7 +60,7 @@ class Compress(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.1
+        coefficient = 0.3
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -111,66 +111,49 @@ class Compress(object):
         df.to_csv(path + '{}.csv'.format(save_n), index=False)
 
     def write_contact_info(self, index, path='output/comp_info/compress_contact_'):
-        with open(path + '{}.csv'.format(index), 'w') as file:
-            writer = csv.writer(file)
-            writer.writerow(['pos_x', 'pos_y', 'pos_z', 'force_x', 'force_y', 'force_z'])
-            for i in range(self.particle.number):
-                for index_i in range(self.contact.lenContactBallBallRecord):
-                    j = self.contact.contacts[i, index_i]
-                    if j == -1:
-                        break
-                    if i > j:
-                        continue
-                    force = vec(self.contact.forceX[i, index_i],
-                                self.contact.forceY[i, index_i],
-                                self.contact.forceZ[i, index_i])
-                    pos = vec(self.contact.positionX[i, index_i],
-                              self.contact.positionY[i, index_i],
-                              self.contact.positionZ[i, index_i])
-                    writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
-            for i in range(self.particle.number):
-                for index_i in range(self.contact.lenContactBallWallRecord):
-                    j = self.contact.contactsBallWall[i, index_i]
-                    if j == -1:
-                        continue
-                    force = vec(self.contact.forceBallWallX[i, index_i],
-                                self.contact.forceBallWallY[i, index_i],
-                                self.contact.forceBallWallZ[i, index_i])
-                    pos = vec(self.contact.positionBallWallX[i, index_i],
-                              self.contact.positionBallWallY[i, index_i],
-                              self.contact.positionBallWallZ[i, index_i])
-                    writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
-
-    def write_contact_info_drained_shear(self, index):
-        with open('output/drained_shear_info/compress_contact_{}.csv'.format(index), 'w') as file:
-            writer = csv.writer(file)
-            writer.writerow(['pos_x', 'pos_y', 'pos_z', 'force_x', 'force_y', 'force_z'])
-            for i in range(self.particle.number):
-                for index_i in range(self.contact.lenContactBallBallRecord):
-                    j = self.contact.contacts[i, index_i]
-                    if j == -1:
-                        break
-                    if i > j:
-                        continue
-                    force = vec(self.contact.forceX[i, index_i],
-                                self.contact.forceY[i, index_i],
-                                self.contact.forceZ[i, index_i])
-                    pos = vec(self.contact.positionX[i, index_i],
-                              self.contact.positionY[i, index_i],
-                              self.contact.positionZ[i, index_i])
-                    writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
-            for i in range(self.particle.number):
-                for index_i in range(self.contact.lenContactBallWallRecord):
-                    j = self.contact.contactsBallWall[i, index_i]
-                    if j == -1:
-                        continue
-                    force = vec(self.contact.forceBallWallX[i, index_i],
-                                self.contact.forceBallWallY[i, index_i],
-                                self.contact.forceBallWallZ[i, index_i])
-                    pos = vec(self.contact.positionX[i, index_i],
-                              self.contact.positionY[i, index_i],
-                              self.contact.positionZ[i, index_i])
-                    writer.writerow([pos[0], pos[1], pos[2], force[0], force[1], force[2]])
+        forceX = []
+        forceY = []
+        forceZ = []
+        positionX = []
+        positionY = []
+        positionZ = []
+        for i in range(self.particle.number):
+            for index_i in range(self.contact.lenContactBallBallRecord):
+                j = self.contact.contacts[i, index_i]
+                if j == -1:
+                    break
+                if i > j:
+                    continue
+                forceX.append(self.contact.forceX[i, index_i])
+                forceY.append(self.contact.forceY[i, index_i])
+                forceZ.append(self.contact.forceZ[i, index_i])
+                positionX.append(self.contact.positionX[i, index_i])
+                positionY.append(self.contact.positionY[i, index_i])
+                positionZ.append(self.contact.positionZ[i, index_i])
+        for i in range(self.particle.number):
+            for index_i in range(self.contact.lenContactBallWallRecord):
+                j = self.contact.contactsBallWall[i, index_i]
+                if j == -1:
+                    continue
+                forceX.append(self.contact.forceX[i, index_i])
+                forceY.append(self.contact.forceY[i, index_i])
+                forceZ.append(self.contact.forceZ[i, index_i])
+                positionX.append(self.contact.positionX[i, index_i])
+                positionY.append(self.contact.positionY[i, index_i])
+                positionZ.append(self.contact.positionZ[i, index_i])
+        forceX = np.array(forceX)
+        forceY = np.array(forceY)
+        forceZ = np.array(forceZ)
+        positionX = np.array(positionX)
+        positionY = np.array(positionY)
+        positionZ = np.array(positionZ)
+        df = pd.DataFrame({'pos_x': positionX,
+                           'pos_y': positionY,
+                           'pos_z': positionZ,
+                           'force_x': forceX,
+                           'force_y': forceY,
+                           'force_z': forceZ})
+        df.to_csv(path + '{}.csv'.format(save_n), index=False)
 
     def set_wall_servo_vel(self):
         vel_tgt = vec(self.servoVelocity[0], self.servoVelocity[1], self.servoVelocity[2])
@@ -207,7 +190,7 @@ class Compress(object):
         if self.contact.model == "linear":
             self.contact.resolve_ball_wall_force(self.particle, self.wall)
         elif self.contact.model == "hertz":
-            self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall)
+            self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall, 1)
         
         # particle update
         gravity = self.get_gravity()
@@ -254,7 +237,7 @@ class Compress(object):
         tgt_p_1 = 200.0e3
         ratio_p = tgt_p_1 / tgt_p_0
         record_count = 0
-        for index_ratio in np.linspace(0, 1, 20):
+        for index_ratio in np.linspace(0, 1, 21):
             tgt_p = tgt_p_0 * (ratio_p) ** index_ratio
             self.set_servo_stress(vec(tgt_p, tgt_p, tgt_p))
             while True:
@@ -348,7 +331,7 @@ class Compress(object):
         self.voidRatio[0] = (self.volume[0] - self.particle.volumeSolid[0]) / self.particle.volumeSolid[0]
 
     def compute_servo_velocity(self):
-        servoFactor = 0.005
+        servoFactor = 0.02
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurY = self.stress[1] * self.length[0] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
@@ -362,8 +345,8 @@ class Compress(object):
         stiffnessX = ti.max((self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5, stiffnessMin)
         stiffnessY = ti.max((self.wall.contactStiffness[2] + self.wall.contactStiffness[3]) * 0.5, stiffnessMin)
         stiffnessZ = ti.max((self.wall.contactStiffness[4] + self.wall.contactStiffness[5]) * 0.5, stiffnessMin)
-        velocityMax = 0.5
-        velocityMin = -0.5
+        velocityMax = 5
+        velocityMin = -5
         servoVelocity = ti.min(vec(
             forceDifX / stiffnessX / self.dt[0] * servoFactor,
             forceDifY / stiffnessY / self.dt[0] * servoFactor,
@@ -373,7 +356,7 @@ class Compress(object):
         self.servoVelocity[1] = servoVelocity[1]
         self.servoVelocity[2] = servoVelocity[2]
 
-    def compute_servo_velocity_drained_shear(self, axial_vel=0.01):
+    def compute_servo_velocity_drained_shear(self, axial_vel=0.1):
         servoFactor = 0.01
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
@@ -384,8 +367,8 @@ class Compress(object):
         stiffnessMin = 1.0e7
         stiffnessX = ti.max((self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5, stiffnessMin)
         stiffnessZ = ti.max((self.wall.contactStiffness[4] + self.wall.contactStiffness[5]) * 0.5, stiffnessMin)
-        velocityMax = 0.5
-        velocityMin = -0.5
+        velocityMax = 5
+        velocityMin = -5
         servoVelocity = ti.min(vec(
             forceDifX / stiffnessX / self.dt[0] * servoFactor,
             axial_vel,
@@ -431,5 +414,5 @@ class Compress(object):
         """pour the particles for demo"""
         self.generate()
         self.aggregate_particles()
-        # self.drained_shear()
+        self.drained_shear()
 
