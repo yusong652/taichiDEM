@@ -20,7 +20,7 @@ class UndrainedShear(object):
         self.substep = 100
         self.particle = Particle(number_particle)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.35, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.2, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -60,7 +60,7 @@ class UndrainedShear(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.5
+        coefficient = 0.05
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -108,7 +108,7 @@ class UndrainedShear(object):
                            'forceContact_y': self.particle.forceContact.to_numpy()[:, 1],
                            'forceContact_z': self.particle.forceContact.to_numpy()[:, 2],
                            'rad': self.particle.rad.to_numpy()})
-        df.to_csv('output/comp_info/ball_info_{}.csv'.format(save_n), index=False)
+        df.to_csv(path + '{}.csv'.format(save_n), index=False)
 
     def write_contact_info(self, index, path='output/comp_info/compress_contact_'):
         with open(path + '{}.csv'.format(index), 'w') as file:
@@ -172,7 +172,7 @@ class UndrainedShear(object):
         if self.contact.model == "linear":
             self.contact.resolve_ball_wall_force(self.particle, self.wall)
         elif self.contact.model == "hertz":
-            self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall)
+            self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall, 1)
         
         # particle update
         gravity = self.get_gravity()
@@ -210,7 +210,7 @@ class UndrainedShear(object):
         self.stressDifRatio[1] = abs(self.stress[1] - self.servoStress[1])/self.servoStress[1]
         self.stressDifRatio[2] = abs(self.stress[2] - self.servoStress[2])/self.servoStress[2]
 
-    def is_stress_stable(self, tolerance=5.0e-3):
+    def is_stress_stable(self, tolerance=1.0e-2):
         return self.stressDifRatio[0] < tolerance and self.stressDifRatio[1] < tolerance and self.stressDifRatio[2] < tolerance
 
     def aggregate_particles(self):
@@ -260,7 +260,7 @@ class UndrainedShear(object):
         self.write_undrained_shear_info_title()
         self.axialLengthIni[0] = self.length[1]
         record_count = 0
-        strain_tgts = np.linspace(0.0, 0.3, 301)
+        strain_tgts = np.linspace(0.0, 0.3, 31)
         strain_tgt = strain_tgts[record_count]
         strain = abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0]
         while abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0] < 0.3:
@@ -270,11 +270,11 @@ class UndrainedShear(object):
                 self.compute_servo_drained_shear()
                 self.update()
             self.print_info()
-            self.write_drained_shear_info()
+            self.write_undrained_shear_info()
             strain = abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0]
             if strain > strain_tgt:
                 self.write_ball_info(record_count, path='output/undrained_shear_info/undrained_shear_contact_')
-                self.write_contact_info(record_count, path='output/undrained_shear_info/drained_shear_contact_')
+                self.write_contact_info(record_count, path='output/undrained_shear_info/undrained_shear_contact_')
                 record_count += 1
                 strain_tgt = strain_tgts[record_count]
 
@@ -285,21 +285,6 @@ class UndrainedShear(object):
             if self.vt_is_on:
                 self.vt.update(self.particle)
             self.print_info()
-
-    def move_wall(self):
-        self.wall.position[5, 2] = self.grid.domain_size * 0.49
-        self.wallPosMax[2] = self.wall.position[5, 2]
-        while True:
-            if self.vt_is_on:
-                self.vt.update(self.particle)
-            for j in range(self.substep):
-                self.update()
-            self.rec_num[0] += 1
-            self.print_info()
-            if self.log_is_on:
-                self.write_ball_info(self.rec_num[0])
-            if self.cyc_num[0] >= 1000000:
-                break
 
     def compute_length(self):
         self.length[0] = self.wall.position[1, 0] - self.wall.position[0, 0]
