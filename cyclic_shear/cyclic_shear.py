@@ -159,7 +159,7 @@ class CyclicShear(object):
                            'force_x': forceX,
                            'force_y': forceY,
                            'force_z': forceZ})
-        df.to_csv(path + '{}.csv'.format(save_n), index=False)
+        df.to_csv(path + '{}.csv'.format(index), index=False)
 
     def set_wall_servo_vel(self):
         vel_tgt = vec(self.servoVelocity[0], self.servoVelocity[1], self.servoVelocity[2])

@@ -18,7 +18,7 @@ vec = ti.math.vec3
 class Compress(object):
     def __init__(self, number_particle, vt_is_on, log_is_on=False):
         self.substep = 100
-        self.particle = Particle(number_particle)  # grain field
+        self.particle = Particle(number_particle, 0.003, 0.002)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
         self.contact = Contact(self.particle.number, fric=0.2, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
@@ -153,7 +153,7 @@ class Compress(object):
                            'force_x': forceX,
                            'force_y': forceY,
                            'force_z': forceZ})
-        df.to_csv(path + '{}.csv'.format(save_n), index=False)
+        df.to_csv(path + '{}.csv'.format(index), index=False)
 
     def set_wall_servo_vel(self):
         vel_tgt = vec(self.servoVelocity[0], self.servoVelocity[1], self.servoVelocity[2])
