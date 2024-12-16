@@ -7,7 +7,7 @@ mat3x3 = ti.types.matrix(3, 3, flt_dtype)
 
 @ti.data_oriented
 class Particle:
-    def __init__(self, number, radius_max=0.015, radius_min=0.01):
+    def __init__(self, number, radius_max=0.003, radius_min=0.002):
 
         self.number = number
         if radius_min > radius_max:
