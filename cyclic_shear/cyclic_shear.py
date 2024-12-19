@@ -17,11 +17,11 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class CyclicShear(object):
-    def __init__(self, number_particle, vt_is_on, log_is_on=False, csr=0.25, freq=8.0):
+    def __init__(self, number_particle, vt_is_on, log_is_on=False, csr=0.25, freq=16.0):
         self.substep = 100
-        self.particle = Particle(number_particle, 0.02, 0.02)  # grain field
+        self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.2, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.3, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
