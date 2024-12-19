@@ -18,9 +18,9 @@ vec = ti.math.vec3
 class Compress(object):
     def __init__(self, number_particle, vt_is_on, log_is_on=False):
         self.substep = 100
-        self.particle = Particle(number_particle, 0.003, 0.002)  # grain field
+        self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.2, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.3, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -60,7 +60,7 @@ class Compress(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.3
+        coefficient = 0.2
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -117,6 +117,9 @@ class Compress(object):
         positionX = []
         positionY = []
         positionZ = []
+        contactType = [] # type of 0 and 1 indicates ball-ball and ball-wall contacts
+        end1 = []
+        end2 = []
         for i in range(self.particle.number):
             for index_i in range(self.contact.lenContactBallBallRecord):
                 j = self.contact.contacts[i, index_i]
@@ -130,29 +133,41 @@ class Compress(object):
                 positionX.append(self.contact.positionX[i, index_i])
                 positionY.append(self.contact.positionY[i, index_i])
                 positionZ.append(self.contact.positionZ[i, index_i])
+                contactType.append(0)
+                end1.append(i)
+                end2.append(j)
         for i in range(self.particle.number):
             for index_i in range(self.contact.lenContactBallWallRecord):
                 j = self.contact.contactsBallWall[i, index_i]
                 if j == -1:
                     continue
-                forceX.append(self.contact.forceX[i, index_i])
-                forceY.append(self.contact.forceY[i, index_i])
-                forceZ.append(self.contact.forceZ[i, index_i])
-                positionX.append(self.contact.positionX[i, index_i])
-                positionY.append(self.contact.positionY[i, index_i])
-                positionZ.append(self.contact.positionZ[i, index_i])
+                forceX.append(self.contact.forceBallWallX[i, index_i])
+                forceY.append(self.contact.forceBallWallY[i, index_i])
+                forceZ.append(self.contact.forceBallWallZ[i, index_i])
+                positionX.append(self.contact.positionBallWallX[i, index_i])
+                positionY.append(self.contact.positionBallWallY[i, index_i])
+                positionZ.append(self.contact.positionBallWallZ[i, index_i])
+                contactType.append(1)
+                end1.append(i)
+                end2.append(j)
         forceX = np.array(forceX)
         forceY = np.array(forceY)
         forceZ = np.array(forceZ)
         positionX = np.array(positionX)
         positionY = np.array(positionY)
         positionZ = np.array(positionZ)
+        contactType = np.array(contactType)
+        end1 = np.array(end1)
+        end2 = np.array(end2)
         df = pd.DataFrame({'pos_x': positionX,
                            'pos_y': positionY,
                            'pos_z': positionZ,
                            'force_x': forceX,
                            'force_y': forceY,
-                           'force_z': forceZ})
+                           'force_z': forceZ,
+                           'contact_type': contactType,
+                           'end1': end1,
+                           'end2': end2})
         df.to_csv(path + '{}.csv'.format(index), index=False)
 
     def set_wall_servo_vel(self):
@@ -331,7 +346,7 @@ class Compress(object):
         self.voidRatio[0] = (self.volume[0] - self.particle.volumeSolid[0]) / self.particle.volumeSolid[0]
 
     def compute_servo_velocity(self):
-        servoFactor = 0.02
+        servoFactor = 0.04
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurY = self.stress[1] * self.length[0] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
@@ -357,7 +372,7 @@ class Compress(object):
         self.servoVelocity[2] = servoVelocity[2]
 
     def compute_servo_velocity_drained_shear(self, axial_vel=0.1):
-        servoFactor = 0.01
+        servoFactor = 0.03
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
         forceTargetX = self.servoStress[0] * self.length[1] * self.length[2]
@@ -400,9 +415,13 @@ class Compress(object):
         print("* particle number: ".ljust(25) + str(self.particle.number))
         print("* time duration (s): ".ljust(25) +
               (str(round(self.duration[0], 6))).ljust(15))
-        print("* stress(Pa): %.2f, %.2f, %.2f "%(self.stress[0], self.stress[1] ,self.stress[2]))
+        print("* stress(kPa): %.6e, %.6e, %.6e "%(self.stress[0]/1.0e3, self.stress[1]/1.0e3 ,self.stress[2]/1.0e3))
+        print("* stiffness(N/m): %.4e, %.4e, %.4e "%(
+            (self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5,
+            (self.wall.contactStiffness[2] + self.wall.contactStiffness[3]) * 0.5,
+            (self.wall.contactStiffness[4] + self.wall.contactStiffness[5]) * 0.5))
         print("* velocity(mm/s): %.6f, %.6f, %.6f "%(self.servoVelocity[0]*1.0e3, self.servoVelocity[1]*1.0e3 ,self.servoVelocity[2]*1.0e3))
-        print("* length(mm): %.6f, %.6f, %.6f "%(self.length[0]*1.0e3, self.length[1]*1.0e3 ,self.length[2]*1.0e3))
+        print("* length(mm): %.6e, %.6e, %.6e "%(self.length[0]*1.0e3, self.length[1]*1.0e3 ,self.length[2]*1.0e3))
         print("* void ratio: %.8f "%self.voidRatio[0])
         print("* timestep (s): ".ljust(25) +
               ("%e" % self.dt[0]).ljust(15))

@@ -19,7 +19,7 @@ vec = ti.math.vec3
 class CyclicShear(object):
     def __init__(self, number_particle, vt_is_on, log_is_on=False, csr=0.25, freq=16.0):
         self.substep = 100
-        self.particle = Particle(number_particle, 0.003, 0.002)  # grain field
+        self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
         self.contact = Contact(self.particle.number, fric=0.3, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
@@ -66,7 +66,7 @@ class CyclicShear(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.3
+        coefficient = 0.2
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -123,6 +123,9 @@ class CyclicShear(object):
         positionX = []
         positionY = []
         positionZ = []
+        contactType = [] # type of 0 and 1 indicates ball-ball and ball-wall contacts
+        end1 = []
+        end2 = []
         for i in range(self.particle.number):
             for index_i in range(self.contact.lenContactBallBallRecord):
                 j = self.contact.contacts[i, index_i]
@@ -136,29 +139,41 @@ class CyclicShear(object):
                 positionX.append(self.contact.positionX[i, index_i])
                 positionY.append(self.contact.positionY[i, index_i])
                 positionZ.append(self.contact.positionZ[i, index_i])
+                contactType.append(0)
+                end1.append(i)
+                end2.append(j)
         for i in range(self.particle.number):
             for index_i in range(self.contact.lenContactBallWallRecord):
                 j = self.contact.contactsBallWall[i, index_i]
                 if j == -1:
                     continue
-                forceX.append(self.contact.forceX[i, index_i])
-                forceY.append(self.contact.forceY[i, index_i])
-                forceZ.append(self.contact.forceZ[i, index_i])
-                positionX.append(self.contact.positionX[i, index_i])
-                positionY.append(self.contact.positionY[i, index_i])
-                positionZ.append(self.contact.positionZ[i, index_i])
+                forceX.append(self.contact.forceBallWallX[i, index_i])
+                forceY.append(self.contact.forceBallWallY[i, index_i])
+                forceZ.append(self.contact.forceBallWallZ[i, index_i])
+                positionX.append(self.contact.positionBallWallX[i, index_i])
+                positionY.append(self.contact.positionBallWallY[i, index_i])
+                positionZ.append(self.contact.positionBallWallZ[i, index_i])
+                contactType.append(1)
+                end1.append(i)
+                end2.append(j)
         forceX = np.array(forceX)
         forceY = np.array(forceY)
         forceZ = np.array(forceZ)
         positionX = np.array(positionX)
         positionY = np.array(positionY)
         positionZ = np.array(positionZ)
+        contactType = np.array(contactType)
+        end1 = np.array(end1)
+        end2 = np.array(end2)
         df = pd.DataFrame({'pos_x': positionX,
                            'pos_y': positionY,
                            'pos_z': positionZ,
                            'force_x': forceX,
                            'force_y': forceY,
-                           'force_z': forceZ})
+                           'force_z': forceZ,
+                           'contact_type': contactType,
+                           'end1': end1,
+                           'end2': end2})
         df.to_csv(path + '{}.csv'.format(index), index=False)
 
     def set_wall_servo_vel(self):
@@ -239,7 +254,7 @@ class CyclicShear(object):
         tgt_p_1 = 200.0e3
         ratio_p = tgt_p_1 / tgt_p_0
         record_count = 0
-        for index_ratio in np.linspace(0, 1, 3):
+        for index_ratio in np.linspace(0, 1, 10):
             tgt_p = tgt_p_0 * (ratio_p) ** index_ratio
             self.set_servo_stress(vec(tgt_p, tgt_p, tgt_p))
             while True:
@@ -251,7 +266,7 @@ class CyclicShear(object):
                     self.update()
                 self.print_info()
                 e1 = self.voidRatio[0]
-                isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-4
+                isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-5
                 if isStable:
                     self.write_ball_info(record_count)
                     self.write_contact_info(record_count)
@@ -268,7 +283,7 @@ class CyclicShear(object):
                 self.update()
             self.print_info()
             e1 = self.voidRatio[0]
-            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-4
+            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 5.0e-6
             if isStable:
                 self.write_ball_info(record_count)
                 self.write_contact_info(record_count)
@@ -282,9 +297,9 @@ class CyclicShear(object):
         record_count = 0
         self.duration[0] = 0.0
         self.durationCyclicIni[0] = self.duration[0]
-        self.contactStiffnessMin[0] = (self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5 * 0.5
+        self.contactStiffnessMin[0] = (self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5 * 0.4
         self.stressP0[0] = self.stressP[0]
-        time_tgts = np.linspace(0.0, 10, 101)
+        time_tgts = np.linspace(0.0, 10, 1001)
         time_tgt = time_tgts[record_count]
         while self.duration[0] < 10.0:
             if self.vt_is_on:
@@ -371,7 +386,7 @@ class CyclicShear(object):
                    self.length[0] * self.length[1])
         dif_f = dif_q * area[1]
         stiff = ti.max((self.wall.contactStiffness[2] + self.wall.contactStiffness[3]) * 0.5, self.contactStiffnessMin[0])
-        servoFactor = 0.02
+        servoFactor = 0.08
         vel_max = 2.0
         vel_min = -2.0
         axial_vel = dif_f / (stiff * self.dt[0]) * servoFactor

@@ -569,8 +569,12 @@ class Contact(object):
             # Gap from the boundary in negative x direction:
             for j in range(wall.number):
                 gap = self.get_ball_wall_gap(particle, wall, i, j)
+                index_wall = -1
                 tangOverTemp = vec(0.0, 0.0, 0.0)
+                Ftotal = vec(0.0, 0.0, 0.0)
+                cpos = vec(0.0, 0.0, 0.0)
                 if gap < 0.0:
+                    index_wall = j
                     effective_E = 5.0e8
                     effective_G = 2.5e8
                     pos1, pos2 = particle.get_pos(i), wall.get_pos(j)
@@ -594,6 +598,8 @@ class Contact(object):
                     normal_contact_force = -2./3. * kn * gap
                     # collision damping
                     normal_damping_force = -1.8257 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+                    if dp_mode == 1:
+                        normal_damping_force = ti.max(normal_damping_force, 0)
                     normal_force = (normal_contact_force + normal_damping_force) * normal
 
                     tangOverlapOld = self.get_ball_wall_tang_overlap_old(i, j)
@@ -602,8 +608,6 @@ class Contact(object):
                     trial_ft = -ks * tangOverTemp
 
                     tang_damping_force = -1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
-                    if dp_mode == 1:
-                        tangential_force = ti.max(tang_damping_force, 0)
 
                     fric = mu * ti.abs(normal_contact_force + normal_damping_force)
                     tangential_force = vec(0.0, 0.0, 0.0)
@@ -618,8 +622,6 @@ class Contact(object):
                     particle.add_force_to_ball(i, Ftotal, resultant_moment)
                     wall.add_contact_force(j, -Ftotal)
                     wall.add_contact_stiffness(j, kn)
-                    self.record_ball_wall_shear_info(i, j, j, tangOverTemp, Ftotal, cpos)
-                else:
-                    self.record_ball_wall_shear_info(i, j, -1, vec(0, 0, 0), vec(0, 0, 0), vec(0, 0, 0))
+                self.record_ball_wall_shear_info(i, j, index_wall, tangOverTemp, Ftotal, cpos)
 
                 

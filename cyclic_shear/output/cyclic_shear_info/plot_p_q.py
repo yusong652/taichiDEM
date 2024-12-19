@@ -15,7 +15,7 @@ strain_y = (-length_y + length_y[0]) / length_y[0] * 100.0
 
 fig = plt.figure
 ax = plt.gca()
-ax.plot(stress_p[::1], stress_q[::1])
+ax.plot(stress_p[::5], stress_q[::5])
 
 ax.set_xscale('linear')
 ax.set_xlim(0.0, 220.0)

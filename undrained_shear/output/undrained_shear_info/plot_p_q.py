@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
+
 df = pd.read_csv("undrained_shear_info.csv")
 stress_x = df['stress_x']
 stress_y = df['stress_y']
