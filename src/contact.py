@@ -9,13 +9,13 @@ class Contact(object):
     # Allocate fields with fixed size for shear force information storage
     """
 
-    def __init__(self, n, fric=0.5, stiff_n=5.0e7, stiff_s=2.5e7, model="linear"):
+    def __init__(self, n, fric=0.5, fric_bw=0.0, stiff_n=5.0e7, stiff_s=2.5e7, model="linear"):
         self.n = n  # number of particles or rows for contact info storage
         self.model = model
         self.frictionBallBall = ti.field(dtype=flt_dtype, shape=(1,))
         self.frictionBallBall[0] = fric
         self.frictionBallWall = ti.field(dtype=flt_dtype, shape=(1,))
-        self.frictionBallWall[0] = 0.5
+        self.frictionBallWall[0] = fric_bw
         self.stiffnessNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.stiffnessNorm[0] = stiff_n
         self.stiffnessNormWall = ti.field(dtype=flt_dtype, shape=(1,))
@@ -27,9 +27,9 @@ class Contact(object):
         self.dampBallBallNorm = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallBallNorm[0] = 0.7
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallBallShear[0] = 0.1
+        self.dampBallBallShear[0] = 0.5
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallNorm[0] = 0.2
+        self.dampBallWallNorm[0] = 0.3
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallWallShear[0] = 0.2
         self.lenContactBallBallRecord = 32
@@ -421,6 +421,7 @@ class Contact(object):
 
         normal_contact_force = -kn * gap
         normal_damping_force = -2.0 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+        normal_damping_force = ti.min(normal_damping_force, 0)
         normal_force = (-normal_contact_force + normal_damping_force) * normal
         tangOverlapOld = vec(0.0, 0.0, 0.0)
         if index_pre != -1:
@@ -473,6 +474,7 @@ class Contact(object):
 
         ndratio, sdratio = self.dampBallBallNorm[0], self.dampBallBallShear[0]
         mu = self.frictionBallBall[0]
+        mu_dynamic = 0.99 * mu
 
         v_rel = vel1 + w1.cross(cpos - pos1) - (vel2 + w2.cross(cpos - pos2))
         vn = v_rel.dot(normal)
@@ -480,6 +482,7 @@ class Contact(object):
 
         normal_contact_force = -2.0/3.0 * kn * gap
         normal_damping_force = -1.8257 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+        normal_damping_force = ti.min(normal_damping_force, 0)
         normal_force = (-normal_contact_force + normal_damping_force) * normal
         tangOverlapOld = vec(0.0, 0.0, 0.0)
         if index_pre != -1:
@@ -487,14 +490,13 @@ class Contact(object):
         tangOverlapRot = tangOverlapOld - tangOverlapOld.dot(normal) * normal
         tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
         trial_ft = - ks * tangOverTemp
-        tang_damping_force = - 1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
-
         fric = mu * ti.abs(normal_contact_force - normal_damping_force)
         tangential_force = vec(0.0, 0.0, 0.0)
         if trial_ft.norm() > fric:
-            tangential_force = fric * trial_ft.normalized()
+            tangential_force = mu_dynamic * ti.abs(normal_contact_force - normal_damping_force) * trial_ft.normalized()
             tangOverTemp = - tangential_force / ks
         else:
+            tang_damping_force = - 1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
             tangential_force = trial_ft + tang_damping_force
         Ftotal = normal_force + tangential_force
         torque = tangential_force.cross(- normal)
@@ -587,6 +589,7 @@ class Contact(object):
                     contactAreaRad = ti.math.sqrt(-gap * rad_eff)
                     ndratio, sdratio = self.dampBallWallNorm[0], self.dampBallWallShear[0]
                     mu = self.frictionBallWall[0]
+                    mu_dynamic = 0.99 * mu
 
                     kn = 2 * effective_E * contactAreaRad
                     ks = 8 * effective_G * contactAreaRad
@@ -607,14 +610,13 @@ class Contact(object):
                     tangOverTemp = vs * self.dt[0] + tangOverlapOld.norm() * self.normalize(tangOverlapRot)
                     trial_ft = -ks * tangOverTemp
 
-                    tang_damping_force = -1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
-
                     fric = mu * ti.abs(normal_contact_force + normal_damping_force)
                     tangential_force = vec(0.0, 0.0, 0.0)
                     if trial_ft.norm() > fric:
-                        tangential_force = fric * trial_ft.normalized()
+                        tangential_force = mu_dynamic * ti.abs(normal_contact_force + normal_damping_force) * trial_ft.normalized()
                         tangOverTemp = - tangential_force / ks
                     else:
+                        tang_damping_force = -1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
                         tangential_force = trial_ft + tang_damping_force
 
                     Ftotal = normal_force + tangential_force

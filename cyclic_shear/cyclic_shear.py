@@ -17,11 +17,11 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class CyclicShear(object):
-    def __init__(self, number_particle, vt_is_on, log_is_on=False, csr=0.25, freq=16.0):
+    def __init__(self, number_particle, vt_is_on, log_is_on=False, csr=0.4, freq=16.0):
         self.substep = 100
         self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.3, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.25, fric_bw=0.0, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -49,6 +49,7 @@ class CyclicShear(object):
         self.durationCyclicIni = ti.field(dtype=flt_dtype, shape=(1,))
         self.contactStiffnessMin = ti.field(dtype=flt_dtype, shape=(1,))
         self.volume = ti.field(dtype=flt_dtype, shape=1)
+        self.volume0 = ti.field(dtype=flt_dtype, shape=1)
         self.voidRatio = ti.field(dtype=flt_dtype, shape=1)
         self.stress = ti.field(dtype=flt_dtype, shape=3)
         self.stressP = ti.field(dtype=flt_dtype, shape=1)
@@ -266,7 +267,7 @@ class CyclicShear(object):
                     self.update()
                 self.print_info()
                 e1 = self.voidRatio[0]
-                isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-5
+                isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-4
                 if isStable:
                     self.write_ball_info(record_count)
                     self.write_contact_info(record_count)
@@ -283,7 +284,7 @@ class CyclicShear(object):
                 self.update()
             self.print_info()
             e1 = self.voidRatio[0]
-            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 5.0e-6
+            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-5
             if isStable:
                 self.write_ball_info(record_count)
                 self.write_contact_info(record_count)
@@ -294,12 +295,13 @@ class CyclicShear(object):
     def cyclic_shear(self):
         self.write_cyclic_shear_info_title()
         self.axialLengthIni[0] = self.length[1]
+        self.volume0[0] = self.volume[0]
         record_count = 0
         self.duration[0] = 0.0
         self.durationCyclicIni[0] = self.duration[0]
         self.contactStiffnessMin[0] = (self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5 * 0.4
         self.stressP0[0] = self.stressP[0]
-        time_tgts = np.linspace(0.0, 10, 1001)
+        time_tgts = np.linspace(0.0, 10, 101)
         time_tgt = time_tgts[record_count]
         while self.duration[0] < 10.0:
             if self.vt_is_on:
@@ -351,7 +353,7 @@ class CyclicShear(object):
         self.voidRatio[0] = (self.volume[0] - self.particle.volumeSolid[0]) / self.particle.volumeSolid[0]
 
     def compute_servo_velocity(self):
-        servoFactor = 0.02
+        servoFactor = 0.04
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurY = self.stress[1] * self.length[0] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
@@ -365,8 +367,8 @@ class CyclicShear(object):
         stiffnessX = ti.max((self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5, stiffnessMin)
         stiffnessY = ti.max((self.wall.contactStiffness[2] + self.wall.contactStiffness[3]) * 0.5, stiffnessMin)
         stiffnessZ = ti.max((self.wall.contactStiffness[4] + self.wall.contactStiffness[5]) * 0.5, stiffnessMin)
-        velocityMax = 5
-        velocityMin = -5
+        velocityMax = 10
+        velocityMin = -10
         servoVelocity = ti.min(vec(
             forceDifX / stiffnessX / self.dt[0] * servoFactor,
             forceDifY / stiffnessY / self.dt[0] * servoFactor,
@@ -386,18 +388,18 @@ class CyclicShear(object):
                    self.length[0] * self.length[1])
         dif_f = dif_q * area[1]
         stiff = ti.max((self.wall.contactStiffness[2] + self.wall.contactStiffness[3]) * 0.5, self.contactStiffnessMin[0])
-        servoFactor = 0.08
-        vel_max = 2.0
-        vel_min = -2.0
+        servoFactor = 0.03
+        vel_max = 4.0
+        vel_min = -4.0
         axial_vel = dif_f / (stiff * self.dt[0]) * servoFactor
         axial_vel = ti.min(axial_vel, vel_max)
         axial_vel = ti.max(axial_vel, vel_min)
-        volume_increment = axial_vel * area[1]
-        volume_frac_x = self.length[2] / (self.length[0] + self.length[2])
-        volume_frac_z = 1. - volume_frac_x
-        servoVelocity = vec(- volume_increment * volume_frac_x / area[0],
-                            axial_vel,
-                            - volume_increment * volume_frac_z / area[2])
+        area_xz = self.volume0[0] / self.length[1]
+        ratio = self.length[2] / self.length[0]
+        delta_x = ti.sqrt(area_xz/ratio) - self.length[0]
+        vel_x = delta_x / self.dt[0] / 2.0
+        vel_z = vel_x * ratio
+        servoVelocity = vec(-vel_x, axial_vel, -vel_z)
         self.servoVelocity[0] = servoVelocity[0]
         self.servoVelocity[1] = servoVelocity[1]
         self.servoVelocity[2] = servoVelocity[2]
