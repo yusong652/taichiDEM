@@ -11,7 +11,7 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.5,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
-number_particle = 1024 * 64
+number_particle = 1024 * 32
 
 us = UndrainedShear(number_particle, vt_is_on=False) 
 us.init()

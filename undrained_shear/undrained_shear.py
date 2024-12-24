@@ -20,7 +20,7 @@ class UndrainedShear(object):
         self.substep = 100
         self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.3, model="hertz")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.25, fric_bw=0.0, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -248,7 +248,7 @@ class UndrainedShear(object):
         tgt_p_1 = 200.0e3
         ratio_p = tgt_p_1 / tgt_p_0
         record_count = 0
-        for index_ratio in np.linspace(0, 1, 21):
+        for index_ratio in np.linspace(0, 1, 11):
             tgt_p = tgt_p_0 * (ratio_p) ** index_ratio
             self.set_servo_stress(vec(tgt_p, tgt_p, tgt_p))
             while True:
@@ -289,7 +289,7 @@ class UndrainedShear(object):
         self.write_undrained_shear_info_title()
         self.axialLengthIni[0] = self.length[1]
         record_count = 0
-        strain_tgts = np.linspace(0.0, 0.3, 31)
+        strain_tgts = np.linspace(0.0, 0.3, 301)
         strain_tgt = strain_tgts[record_count]
         strain = abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0]
         while abs(self.axialLengthIni[0] - self.length[1]) / self.axialLengthIni[0] < 0.3:
@@ -352,7 +352,7 @@ class UndrainedShear(object):
         self.servoVelocity[1] = servoVelocity[1]
         self.servoVelocity[2] = servoVelocity[2]
 
-    def compute_servo_velocity_undrained_shear(self, axial_vel=0.1):
+    def compute_servo_velocity_undrained_shear(self, axial_vel=0.01):
         area = vec(self.length[1] * self.length[2],
                    self.length[0] * self.length[2],
                    self.length[0] * self.length[1])
