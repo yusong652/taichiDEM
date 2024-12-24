@@ -66,7 +66,7 @@ class CyclicShear(object):
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
         mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.3
+        coefficient = 0.2
         timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
         return timestep
 
@@ -145,16 +145,17 @@ class CyclicShear(object):
         for i in range(self.particle.number):
             for index_i in range(self.contact.lenContactBallWallRecord):
                 j = self.contact.contactsBallWall[i, index_i]
-                if j != -1:
-                    forceX.append(self.contact.forceBallWallX[i, index_i])
-                    forceY.append(self.contact.forceBallWallY[i, index_i])
-                    forceZ.append(self.contact.forceBallWallZ[i, index_i])
-                    positionX.append(self.contact.positionBallWallX[i, index_i])
-                    positionY.append(self.contact.positionBallWallY[i, index_i])
-                    positionZ.append(self.contact.positionBallWallZ[i, index_i])
-                    contactType.append(1)
-                    end1.append(i)
-                    end2.append(j)
+                if j == -1:
+                    continue
+                forceX.append(self.contact.forceBallWallX[i, index_i])
+                forceY.append(self.contact.forceBallWallY[i, index_i])
+                forceZ.append(self.contact.forceBallWallZ[i, index_i])
+                positionX.append(self.contact.positionBallWallX[i, index_i])
+                positionY.append(self.contact.positionBallWallY[i, index_i])
+                positionZ.append(self.contact.positionBallWallZ[i, index_i])
+                contactType.append(1)
+                end1.append(i)
+                end2.append(j)
         forceX = np.array(forceX)
         forceY = np.array(forceY)
         forceZ = np.array(forceZ)
@@ -282,7 +283,7 @@ class CyclicShear(object):
                 self.update()
             self.print_info()
             e1 = self.voidRatio[0]
-            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 1.0e-5
+            isStable = self.is_stress_stable() and abs(e1 - e0)/e0 < 5.0e-6
             if isStable:
                 self.write_ball_info(record_count)
                 self.write_contact_info(record_count)
@@ -296,9 +297,9 @@ class CyclicShear(object):
         record_count = 0
         self.duration[0] = 0.0
         self.durationCyclicIni[0] = self.duration[0]
-        self.contactStiffnessMin[0] = (self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5 * 0.5
+        self.contactStiffnessMin[0] = (self.wall.contactStiffness[0] + self.wall.contactStiffness[1]) * 0.5 * 0.4
         self.stressP0[0] = self.stressP[0]
-        time_tgts = np.linspace(0.0, 10, 101)
+        time_tgts = np.linspace(0.0, 10, 1001)
         time_tgt = time_tgts[record_count]
         while self.duration[0] < 10.0:
             if self.vt_is_on:
@@ -385,7 +386,7 @@ class CyclicShear(object):
                    self.length[0] * self.length[1])
         dif_f = dif_q * area[1]
         stiff = ti.max((self.wall.contactStiffness[2] + self.wall.contactStiffness[3]) * 0.5, self.contactStiffnessMin[0])
-        servoFactor = 0.02
+        servoFactor = 0.08
         vel_max = 2.0
         vel_min = -2.0
         axial_vel = dif_f / (stiff * self.dt[0]) * servoFactor

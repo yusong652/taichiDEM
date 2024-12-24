@@ -598,6 +598,8 @@ class Contact(object):
                     normal_contact_force = -2./3. * kn * gap
                     # collision damping
                     normal_damping_force = -1.8257 * ndratio * ti.math.sqrt(m_eff * kn) * vn
+                    if dp_mode == 1:
+                        normal_damping_force = ti.max(normal_damping_force, 0)
                     normal_force = (normal_contact_force + normal_damping_force) * normal
 
                     tangOverlapOld = self.get_ball_wall_tang_overlap_old(i, j)
@@ -606,8 +608,6 @@ class Contact(object):
                     trial_ft = -ks * tangOverTemp
 
                     tang_damping_force = -1.8257 * sdratio * ti.math.sqrt(m_eff * ks) * vs
-                    if dp_mode == 1:
-                        tangential_force = ti.max(tang_damping_force, 0)
 
                     fric = mu * ti.abs(normal_contact_force + normal_damping_force)
                     tangential_force = vec(0.0, 0.0, 0.0)

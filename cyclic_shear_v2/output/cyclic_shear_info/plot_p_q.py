@@ -18,7 +18,7 @@ ax = plt.gca()
 ax.plot(stress_p[::5], stress_q[::5])
 
 ax.set_xscale('linear')
-ax.set_xlim(0.0, 220.0)
-ax.set_ylim(-80.0, 80.0)
+# ax.set_xlim(0.0, 220.0)
+# ax.set_ylim(-80.0, 80.0)
 
 plt.show()
