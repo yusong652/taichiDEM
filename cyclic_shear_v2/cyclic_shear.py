@@ -21,7 +21,7 @@ class CyclicShear(object):
         self.substep = 100
         self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.25, fric_bw=0.0, model="linear")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.25, fric_bw=0.0, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -206,7 +206,7 @@ class CyclicShear(object):
         # contact detection
         self.contact.detect(self.particle, self.grid)
         if self.contact.model == "linear":
-            self.contact.resolve_ball_wall_force(self.particle, self.wall, 1)
+            self.contact.resolve_ball_wall_force(self.particle, self.wall)
         elif self.contact.model == "hertz":
             self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall, 1)
         
