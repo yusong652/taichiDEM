@@ -7,7 +7,7 @@ mat3x3 = ti.types.matrix(3, 3, flt_dtype)
 
 @ti.data_oriented
 class Particle:
-    def __init__(self, number, radius_max=0.02, radius_min=0.01):
+    def __init__(self, number, radius_max=0.01, radius_min=0.01):
 
         self.number = number
         if radius_min > radius_max:
@@ -192,24 +192,21 @@ class Particle:
             
             inv_i = self.get_inv_i(i)
             inertia = 1. / inv_i
-            old_omega, old_q = self.get_vel_rot(i), self.get_q(i)
+            old_angmoment, old_omega, old_q = self.get_angmoment(i), self.get_vel_rot(i), self.get_q(i)
 
             torque = self.cundall_damp1st(tdamp, ctorque, old_omega)
-            rotation_matrix = self.SetToRotate(old_q)
+            angmoment = old_angmoment + 0.5 * torque * dt
+            omega = angmoment * inv_i
+            dq = dt * self.SetDQ(old_q, omega)
+            half_q = old_q + dq * 0.5
+            angmoment_half = old_angmoment + torque * dt
+            omega_half = angmoment_half * inv_i
+            dq_half = dt * self.SetDQ(half_q, omega_half)
+            q = old_q + dq_half
 
-            torque_local = rotation_matrix.transpose() @ torque
-            omega_local = rotation_matrix.transpose() @ old_omega
-            K1 = dt * self.w_dot(omega_local, torque_local, inertia, inv_i)
-            K2 = dt * self.w_dot(omega_local + K1, torque_local, inertia, inv_i)
-            K3 = dt * self.w_dot(omega_local + 0.25 * (K1 + K2), torque_local, inertia, inv_i)
-            omega_local += (K1 + K2 + 4. * K3) / 6.
-            omega = rotation_matrix @ omega_local
-
-            dq = dt * self.SetDQ(old_q, omega_local)
-            q = self.normalize_quaternion(old_q + dq)
-
-            self.set_vel_rot(i, omega)
-            self.set_q(i, q)
+            self.set_vel_rot(i, omega_half)
+            self.set_angmoment(i, angmoment_half)
+            self.set_q(i, self.normalize_quaternion(q))
 
     @ti.kernel
     def clear_force(self):
@@ -259,7 +256,7 @@ class Particle:
         return force
 
     @ti.func
-    def get_radius(self, i: ti.i32) -> flt_dtype:
+    def get_radius(self, i):
         return self.rad[i]
 
     @ti.func
@@ -291,7 +288,7 @@ class Particle:
         self.verletDisp[i, 2] = verletDisp[2]
 
     @ti.func
-    def get_vel(self, i: ti.i32) -> vec:
+    def get_vel(self, i):
         return vec(self.vel[i, 0], self.vel[i, 1], self.vel[i, 2])
 
     @ti.func

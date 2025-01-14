@@ -19,9 +19,9 @@ vec = ti.math.vec3
 class CyclicShear(object):
     def __init__(self, number_particle, vt_is_on, log_is_on=False, csr=0.25, freq=8.0):
         self.substep = 100
-        self.particle = Particle(number_particle, 0.01, 0.005)  # grain field
+        self.particle = Particle(number_particle, 0.01, 0.01)  # grain field
         self.grid = Grid(num_ptc=self.particle.number, rad_max=self.particle.radMax[0])
-        self.contact = Contact(self.particle.number, fric=0.18, fric_bw=0.0, model="linear")  # contact info
+        self.contact = Contact(self.particle.number, fric=0.3, fric_bw=0.0, model="hertz")  # contact info
         self.vt_is_on = vt_is_on
         self.log_is_on = log_is_on
         if self.vt_is_on:  # Visual mode on
@@ -66,9 +66,13 @@ class CyclicShear(object):
 
     def get_critical_timestep(self):
         rad_min = self.particle.radMin[0]
-        mass_min = ti.math.pi * rad_min**3 * 4 / 3 * self.particle.density[0]
-        coefficient = 0.1
-        timestep = ti.sqrt(mass_min/(self.contact.stiffnessNorm[0]*2.0)) * 2.0 * coefficient
+        density = self.particle.density[0]
+        modulusE = self.contact.effective_E[0]
+        modulusG = self.contact.effective_G[0]
+        poission = modulusE / modulusG / 2. - 1.
+        modulus = 2. * modulusG * (2. - poission)
+        beta = 0.8766 + 0.163 * poission
+        timestep = ti.math.pi * rad_min * ti.sqrt(density/modulus) / beta
         return timestep
 
     def init(self,):
@@ -210,14 +214,14 @@ class CyclicShear(object):
         elif self.contact.model == "hertz":
             self.contact.resolve_ball_wall_force_hertz(self.particle, self.wall, 1)
         
-        # particle update
-        gravity = self.get_gravity()
-        self.particle.update_pos_verlet(self.dt[0], gravity)
-        # wall
-        self.wall.update_position(timestep=self.dt[0])
-        # advance time
-        self.update_time()
-        self.cyc_num[0] += 1
+        # # particle update
+        # gravity = self.get_gravity()
+        # self.particle.update_pos_verlet(self.dt[0], gravity)
+        # # wall
+        # self.wall.update_position(timestep=self.dt[0])
+        # # advance time
+        # self.update_time()
+        # self.cyc_num[0] += 1
 
     def generate(self):
         self.particle.init_particle(
@@ -353,7 +357,7 @@ class CyclicShear(object):
         self.voidRatio[0] = (self.volume[0] - self.particle.volumeSolid[0]) / self.particle.volumeSolid[0]
 
     def compute_servo_velocity(self):
-        servoFactor = 0.05
+        servoFactor = 0.1
         forceCurX = self.stress[0] * self.length[1] * self.length[2]
         forceCurY = self.stress[1] * self.length[0] * self.length[2]
         forceCurZ = self.stress[2] * self.length[0] * self.length[1]
@@ -443,6 +447,6 @@ class CyclicShear(object):
     def run(self, ):
         """pour the particles for demo"""
         self.generate()
-        self.aggregate_particles()
-        self.cyclic_shear()
+        # self.aggregate_particles()
+        # self.cyclic_shear()
 

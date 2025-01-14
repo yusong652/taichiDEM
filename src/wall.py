@@ -5,26 +5,30 @@ vec = ti.math.vec3
 
 @ti.data_oriented
 class Wall:
-    def __init__(self, num_wall, pos_x_min, pos_x_max, pos_y_min, pos_y_max, pos_z_min, pos_z_max):
+    def __init__(self, num_wall: ti.int32, pos_x_min: flt_dtype, pos_x_max: flt_dtype,
+                 pos_y_min: flt_dtype, pos_y_max: flt_dtype, pos_z_min: flt_dtype, pos_z_max: flt_dtype):
         self.number = num_wall
         self.position = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.initialize_box_pos(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         self.normal = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.initialize_box_normal()
         self.velocity = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
-        self.friction = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.friction = ti.field(dtype=flt_dtype, shape=num_wall)
+        self.initialize_box_friction()
         self.stiffnessNorm = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.stiffnessShear = ti.field(dtype=flt_dtype, shape=(num_wall,))
+        self.initialize_box_stiffness(stiff_norm=5.0e7, stiff_shear=1.0e7)
         self.dampNRatio = ti.field(dtype=flt_dtype, shape=(num_wall,))
         self.dampSRatio = ti.field(dtype=flt_dtype, shape=(num_wall,))
-        self.contactForce = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
-        self.contactStiffness = ti.field(dtype=flt_dtype, shape=(num_wall,))
-        self.initialize_box_pos(pos_x_min, pos_x_max, pos_y_min, pos_y_max, pos_z_min, pos_z_max)
-        self.initialize_box_normal()
-        self.initialize_box_friction()
-        self.initialize_box_stiffness(stiff_norm=5.0e7, stiff_shear=1.0e7)
         self.initialize_box_dampNRatio(damp=0.3)
         self.initialize_box_dampSRatio(damp=0.3)
+        self.contactForce = ti.field(dtype=flt_dtype, shape=(num_wall, 3))
+        self.contactStiffness = ti.field(dtype=flt_dtype, shape=(num_wall,))
 
-    def initialize_box_pos(self, pos_x_min, pos_x_max, pos_y_min, pos_y_max, pos_z_min, pos_z_max):
+    @ti.kernel
+    def initialize_box_pos(self, pos_x_min: flt_dtype, pos_x_max: flt_dtype,
+                           pos_y_min: flt_dtype, pos_y_max: flt_dtype, 
+                           pos_z_min: flt_dtype, pos_z_max: flt_dtype):
         # walls on x-direction
         self.position[0, 0] = pos_x_min
         self.position[0, 1] = 0.0
@@ -70,9 +74,9 @@ class Wall:
         self.normal[5, 1] = -normal_z[1]
         self.normal[5, 2] = -normal_z[2]
 
-    def initialize_box_friction(self, fric=0.5):
+    def initialize_box_friction(self, friction=0.5):
         for i in range(self.number):
-            self.friction[i] = fric
+            self.friction[i] = friction
 
     def initialize_box_stiffness(self, stiff_norm=5.0e7, stiff_shear=1.0e7):
         for i in range(self.number):
