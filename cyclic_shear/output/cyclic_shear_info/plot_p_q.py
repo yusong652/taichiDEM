@@ -15,11 +15,11 @@ strain_y = (-length_y + length_y[0]) / length_y[0] * 100.0
 
 fig = plt.figure()
 ax = plt.gca()
-ax.plot(stress_p[::8], stress_q[::8])
+ax.plot(stress_p[::16], stress_q[::16])
 
 ax.set_xscale('linear')
 ax.set_xlim(0.0, 220.0)
-ax.set_ylim(-150.0, 150.0)
+ax.set_ylim(-80.0, 80.0)
 ax.set_xlabel("Mean effective stress p'")
 ax.set_ylabel("Deviator stress q")
 
