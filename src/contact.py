@@ -29,9 +29,9 @@ class Contact(object):
         self.dampBallBallShear = ti.field(dtype=flt_dtype, shape=(1,))
         self.dampBallBallShear[0] = 0.5
         self.dampBallWallNorm = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallNorm[0] = 0.1
+        self.dampBallWallNorm[0] = 0.0
         self.dampBallWallShear = ti.field(dtype=flt_dtype, shape=(1,))
-        self.dampBallWallShear[0] = 0.2
+        self.dampBallWallShear[0] = 0.0
         self.lenContactBallBallRecord = 32
         self.lenContactBallWallRecord = 6
         # id of particles in contact

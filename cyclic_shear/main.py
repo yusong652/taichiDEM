@@ -11,9 +11,9 @@ ti.init(arch=ti.cpu, device_memory_fraction=0.3,
         default_ip=ti.i32, debug=True,
         fast_math=False)
 
-number_particle = 1024 * 16
+number_particle = 1024 * 2
 
-cs = CyclicShear(number_particle, vt_is_on=False) 
+cs = CyclicShear(number_particle, vt_is_on=True) 
 cs.init()
 if __name__ == "__main__":
     cs.run()

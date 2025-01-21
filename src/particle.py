@@ -44,9 +44,9 @@ class Particle:
                                name="moment")
         self.q = ti.field(dtype=flt_dtype, shape=(number, 4), name="quaternion")
         self.damp_f = ti.field(dtype=flt_dtype, shape=(1, ),)
-        self.damp_f[0] = 0.0
+        self.damp_f[0] = 0.00
         self.damp_t = ti.field(dtype=flt_dtype, shape=(1, ),)
-        self.damp_t[0] = 0.0
+        self.damp_t[0] = 0.00
         self.volumeSolid = ti.field(dtype=flt_dtype, shape=(1), name='solid volume')
 
     @ti.kernel
